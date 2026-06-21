@@ -4,6 +4,7 @@ import type { ObstacleInterface } from './obstacles';
 import { getObstacles, removeObstacleIds } from './obstacles';
 import { isCubeFullySubmerged, isPlayerInLava } from './lava';
 import { cubeLavaContactPoint } from './lavaSplash';
+import { getPlatformType, platformTypeSkipsSettle } from './platformTypes';
 import { startPlatform, type PlatformInterface } from './platforms';
 
 const { Bodies, Body, Engine, Events, Query, World } = Matter;
@@ -56,6 +57,8 @@ interface PhysicsContextInterface {
 }
 
 function platformBody(platform: PlatformInterface): Matter.Body {
+  const type = getPlatformType(platform.typeId);
+
   return Bodies.rectangle(
     platform.x + platform.width / 2,
     platform.y + platform.height / 2,
@@ -63,9 +66,10 @@ function platformBody(platform: PlatformInterface): Matter.Body {
     platform.height,
     {
       isStatic: true,
-      friction: 0.65,
+      friction: type.friction,
+      frictionStatic: type.frictionStatic,
       restitution: gameConfig.restitution,
-      label: 'platform',
+      label: `platform-${type.id}`,
     },
   );
 }
@@ -395,6 +399,7 @@ function findSupportPlatform(
   centerX: number,
   centerY: number,
   angle: number,
+  maxDistance = 18,
 ): PlatformInterface | null {
   const half = gameConfig.ballRadius;
   const bottom = centerY + playerBottomExtent(angle);
@@ -407,7 +412,7 @@ function findSupportPlatform(
     if (centerX < landingMinX || centerX > landingMaxX) continue;
 
     const distance = Math.abs(bottom - platform.y);
-    if (distance < 18 && distance < bestDistance) {
+    if (distance < maxDistance && distance < bestDistance) {
       best = platform;
       bestDistance = distance;
     }
@@ -565,6 +570,33 @@ export function updatePlatformBodyPositions(platformList: PlatformInterface[]): 
 export function getPlayerSupportPlatform(platformList: PlatformInterface[]): PlatformInterface | null {
   const body = gameContext.ball;
   return findSupportPlatform(platformList, body.position.x, body.position.y, body.angle);
+}
+
+export function isStandingOnIce(platformList: PlatformInterface[]): boolean {
+  const support = getCarrySupportPlatform(platformList) ?? getPlayerSupportPlatform(platformList);
+  return platformTypeSkipsSettle(support?.typeId);
+}
+
+export function updatePlayerSurfaceFriction(platformList: PlatformInterface[]): void {
+  const support = getCarrySupportPlatform(platformList) ?? getPlayerSupportPlatform(platformList);
+  const friction = getPlatformType(support?.typeId).playerFriction;
+  if (gameContext.ball.friction === friction) return;
+  Body.set(gameContext.ball, { friction });
+}
+
+export function isBallStatic(): boolean {
+  return gameContext.ball.isStatic;
+}
+
+export function getCarrySupportPlatform(platformList: PlatformInterface[]): PlatformInterface | null {
+  const body = gameContext.ball;
+  return findSupportPlatform(
+    platformList,
+    body.position.x,
+    body.position.y,
+    body.angle,
+    26,
+  );
 }
 
 export function translatePlayerHorizontal(dx: number): void {

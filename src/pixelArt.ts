@@ -1,39 +1,35 @@
 import { gameConfig } from './config';
+import { getPlatformType } from './platformTypes';
 import type { PlatformInterface } from './platforms';
 import type { Vec2Interface } from './physics';
 
 export const palette = {
-  skyTop: '#1a1238',
-  skyMid: '#5a2868',
-  skyHorizon: '#b8434a',
-  skyBottom: '#e86a28',
-  star: '#ffd4a8',
-  starDim: '#c98a72',
-  platformTop: '#c9a87a',
-  platformTopMoving: '#e8c898',
-  platformFace: '#7a5a48',
-  platformFaceAlt: '#5a4038',
-  platformShadow: '#3d2a24',
-  platformEdge: '#a88462',
-  platformChecker: '#4a342c',
-  player: '#36d9ff',
-  playerShadow: '#1a8fb8',
-  playerHighlight: '#9ef0ff',
-  playerEyes: '#1a1238',
-  playerDim: '#248eb0',
-  obstacle: '#8b8078',
-  obstacleShadow: '#5c554f',
-  obstacleHighlight: '#a8a098',
+  skyTop: '#8a96a8',
+  skyMid: '#b2a9c1',
+  skyHorizon: '#c8d4dc',
+  skyBottom: '#dcd9e1',
+  star: '#e6f2f5',
+  starDim: '#a8c0c9',
+  player: '#c2e5e9',
+  playerShadow: '#6a98a8',
+  playerHighlight: '#eefafc',
+  playerEyeWhite: '#f4fafc',
+  playerPupil: '#2e3a48',
+  playerEyes: '#2e3a48',
+  playerDim: '#8ab4c0',
+  obstacle: '#8a9eb0',
+  obstacleShadow: '#523242',
+  obstacleHighlight: '#b8cdd8',
   lavaBright: '#ffb830',
   lavaMid: '#ff8820',
   lavaDark: '#d43818',
   lavaDeep: '#8a2010',
   lavaOutline: '#ffe860',
-  slingshot: '#ff4060',
-  slingshotAnchor: '#8b6078',
-  trajectory: '#ffe860',
-  white: '#fff8ee',
-  milestone: '#fff8ee',
+  slingshot: '#88b4c4',
+  slingshotAnchor: '#7c5f4d',
+  trajectory: '#c2e5e9',
+  white: '#e6f2f5',
+  milestone: '#c2e5e9',
 } as const;
 
 export function snap(value: number, unit = gameConfig.pixelArt.snapUnit): number {
@@ -105,8 +101,23 @@ function drawStars(
 }
 
 export function isPlayerEyesOpen(animTime: number): boolean {
-  const { playerBlinkIntervalS, playerBlinkDurationS } = gameConfig.pixelArt;
+  const {
+    playerBlinkIntervalS,
+    playerBlinkDurationS,
+    playerDoubleBlinkChance,
+    playerDoubleBlinkGapS,
+  } = gameConfig.pixelArt;
   const cycleT = animTime % playerBlinkIntervalS;
+  const cycleIndex = Math.floor(animTime / playerBlinkIntervalS);
+  const doubleBlink = (hash2(cycleIndex, 41) % 100) < Math.floor(playerDoubleBlinkChance * 100);
+
+  if (doubleBlink) {
+    const secondBlinkStart = playerBlinkDurationS + playerDoubleBlinkGapS;
+    const closed = cycleT < playerBlinkDurationS
+      || (cycleT >= secondBlinkStart && cycleT < secondBlinkStart + playerBlinkDurationS);
+    return !closed;
+  }
+
   return cycleT >= playerBlinkDurationS;
 }
 
@@ -129,12 +140,13 @@ export function drawPixelPlatforms(
   const tile = gameConfig.pixelArt.tileSize;
 
   for (const platform of platforms) {
+    const visual = getPlatformType(platform.typeId).visual;
     const x = snap(platform.x);
     const y = snap(platform.y);
     const w = snap(platform.width);
     const h = snap(platform.height);
 
-    ctx.fillStyle = palette.platformShadow;
+    ctx.fillStyle = visual.shadow;
     ctx.fillRect(x + 2, y + 2, w, h);
 
     for (let ty = y; ty < y + h; ty += tile) {
@@ -147,22 +159,26 @@ export function drawPixelPlatforms(
         const isBottom = ty + th >= y + h;
 
         if (isTop) {
-          ctx.fillStyle = platform.motion ? palette.platformTopMoving : palette.platformTop;
+          if (visual.sparkleTop && (col + row) % 3 === 0) {
+            ctx.fillStyle = palette.white;
+          } else {
+            ctx.fillStyle = platform.motion ? visual.topMoving : visual.top;
+          }
         } else if (isBottom) {
-          ctx.fillStyle = palette.platformShadow;
+          ctx.fillStyle = visual.shadow;
         } else if ((row + col) % 2 === 0) {
-          ctx.fillStyle = palette.platformFace;
+          ctx.fillStyle = visual.face;
         } else {
-          ctx.fillStyle = palette.platformChecker;
+          ctx.fillStyle = visual.checker;
         }
 
         ctx.fillRect(tx, ty, tw, th);
       }
     }
 
-    ctx.fillStyle = platform.motion ? palette.platformTopMoving : palette.platformEdge;
+    ctx.fillStyle = platform.motion ? visual.topMoving : visual.edge;
     ctx.fillRect(x, y, w, 3);
-    ctx.fillStyle = platform.motion ? palette.platformTopMoving : palette.platformTop;
+    ctx.fillStyle = platform.motion ? visual.topMoving : visual.top;
     ctx.fillRect(x + 2, y + 1, w - 4, 2);
   }
 }
@@ -204,9 +220,84 @@ function cubeStyle(kind: 'player' | 'obstacle' | 'lava', dimmed: boolean): Pixel
     shadow: palette.playerShadow,
     highlight: palette.playerHighlight,
     outline: palette.playerShadow,
-    withFace: !dimmed,
+    withFace: true,
     dimmed,
   };
+}
+
+export interface PlayerEyeGazeInterface {
+  left: Vec2Interface;
+  right: Vec2Interface;
+}
+
+function worldGazeToLocal(gaze: Vec2Interface, angle: number): Vec2Interface {
+  const cos = Math.cos(-angle);
+  const sin = Math.sin(-angle);
+  return {
+    x: gaze.x * cos - gaze.y * sin,
+    y: gaze.x * sin + gaze.y * cos,
+  };
+}
+
+function clampEye(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function drawPlayerEye(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  centerY: number,
+  whiteSize: number,
+  pupilSize: number,
+  gaze: Vec2Interface,
+  wide = false,
+): void {
+  const whiteW = wide ? Math.max(whiteSize + 2, Math.floor(whiteSize * 1.2)) : whiteSize;
+  const whiteH = whiteSize;
+  const halfWhiteW = whiteW / 2;
+  const halfWhiteH = whiteH / 2;
+  const whiteX = snap(centerX - halfWhiteW);
+  const whiteY = snap(centerY - halfWhiteH);
+  const maxOffsetX = Math.max(1, (whiteW - pupilSize) / 2);
+  const maxOffsetY = Math.max(1, (whiteH - pupilSize) / 2);
+  const pupilOffsetX = clampEye(gaze.x, -1, 1) * maxOffsetX;
+  const pupilOffsetY = clampEye(gaze.y, -1, 1) * maxOffsetY;
+  const pupilX = snap(centerX + pupilOffsetX - pupilSize / 2);
+  const pupilY = snap(centerY + pupilOffsetY - pupilSize / 2);
+
+  ctx.fillStyle = palette.playerEyeWhite;
+  ctx.fillRect(whiteX, whiteY, whiteW, whiteH);
+
+  ctx.fillStyle = palette.playerPupil;
+  ctx.fillRect(pupilX, pupilY, pupilSize, pupilSize);
+}
+
+function drawPlayerFace(
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  eyesOpen: boolean,
+  angle: number,
+  gaze?: PlayerEyeGazeInterface,
+  eyesWide = false,
+): void {
+  const eyeSize = Math.max(6, Math.floor(px * (eyesWide ? 0.3 : 0.24)));
+  const pupilSize = Math.max(3, Math.floor(px * (eyesWide ? 0.09 : 0.1)));
+  const eyeY = -Math.floor(px * (eyesWide ? 0.12 : 0.1));
+  const eyeGap = Math.max(4, Math.floor(px * (eyesWide ? 0.16 : 0.18)));
+
+  if (eyesOpen) {
+    const leftGaze = worldGazeToLocal(gaze?.left ?? { x: 0, y: -1 }, angle);
+    const rightGaze = worldGazeToLocal(gaze?.right ?? { x: 0, y: -1 }, angle);
+
+    drawPlayerEye(ctx, -eyeGap, eyeY, eyeSize, pupilSize, leftGaze, eyesWide);
+    drawPlayerEye(ctx, eyeGap, eyeY, eyeSize, pupilSize, rightGaze, eyesWide);
+    return;
+  }
+
+  const blinkY = -Math.floor(px * 0.08);
+  ctx.fillStyle = palette.playerShadow;
+  ctx.fillRect(-Math.floor(px * 0.34), blinkY, Math.floor(px * 0.22), 2);
+  ctx.fillRect(Math.floor(px * 0.12), blinkY, Math.floor(px * 0.22), 2);
 }
 
 export function drawPixelCube(
@@ -218,13 +309,17 @@ export function drawPixelCube(
   kind: 'player' | 'obstacle' | 'lava',
   dimmed = false,
   eyesOpen = true,
+  gaze?: PlayerEyeGazeInterface,
+  eyesWide = false,
+  offsetX = 0,
+  offsetY = 0,
 ): void {
   const half = size / 2;
   const style = cubeStyle(kind, dimmed);
   const px = snap(size, 2);
 
   ctx.save();
-  ctx.translate(snap(x), snap(y));
+  ctx.translate(snap(x) + offsetX, snap(y) + offsetY);
   ctx.rotate(angle);
 
   const inset = Math.max(2, Math.floor(px * 0.12));
@@ -243,17 +338,8 @@ export function drawPixelCube(
   ctx.fillRect(-half, half - 2, px, 2);
   ctx.fillRect(half - 2, -half, 2, px);
 
-  if (style.withFace && eyesOpen) {
-    const eye = Math.max(2, Math.floor(px * 0.14));
-    const eyeY = -Math.floor(px * 0.12);
-    const eyeGap = Math.max(3, Math.floor(px * 0.22));
-    ctx.fillStyle = palette.playerEyes;
-    ctx.fillRect(-eyeGap - eye, eyeY, eye, eye);
-    ctx.fillRect(eyeGap, eyeY, eye, eye);
-  } else if (style.withFace && !eyesOpen) {
-    const eyeY = -Math.floor(px * 0.1);
-    ctx.fillStyle = palette.playerShadow;
-    ctx.fillRect(-Math.floor(px * 0.32), eyeY, Math.floor(px * 0.64), 2);
+  if (style.withFace) {
+    drawPlayerFace(ctx, px, eyesOpen, angle, gaze, eyesWide);
   }
 
   ctx.restore();

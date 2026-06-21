@@ -86,6 +86,7 @@ function spawnObstaclePyramid(platform: PlatformInterface, centerX: number): voi
 }
 
 export function trySpawnObstacleForPlatform(platform: PlatformInterface): void {
+  if (!obstacleConfig().enabled) return;
   if (platform === startPlatform) return;
   if (Math.random() > obstacleConfig().spawnChance) return;
 

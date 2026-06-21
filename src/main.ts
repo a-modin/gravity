@@ -19,6 +19,7 @@ import {
   drawPixelSlingshotLine,
   drawPixelTrajectory,
   isPlayerEyesOpen,
+  type PlayerEyeGazeInterface,
 } from './pixelArt';
 import { getPlatforms, resetPlatformGenerator, trackPlatformGeneratorHeight, updatePlatformGenerator } from './platformGenerator';
 import { updateMovingPlatforms } from './platformMotion';
@@ -50,7 +51,10 @@ import {
   translateObstacleBodies,
   translatePlayerHorizontal,
   updatePlatformBodyPositions,
-  getPlayerSupportPlatform,
+  getCarrySupportPlatform,
+  isBallStatic,
+  isStandingOnIce,
+  updatePlayerSurfaceFriction,
   type Vec2Interface,
 } from './physics';
 
@@ -127,7 +131,7 @@ function applyClimbCheckpoint(climb: ClimbCheckpointInterface): void {
 }
 
 function formatHeight(meters: number): string {
-  return `${meters} м`;
+  return `${meters} m`;
 }
 
 function climbHeightFromY(ballY: number): number {
@@ -151,7 +155,7 @@ function resetClimbHeight(baselineY: number): void {
 }
 
 function triggerMilestoneCelebration(meters: number): void {
-  milestonePopupEl.textContent = `${meters} м`;
+  milestonePopupEl.textContent = `${meters} m`;
   milestonePopupEl.hidden = false;
   milestonePopupEl.classList.remove('is-active');
   void milestonePopupEl.offsetWidth;
@@ -230,6 +234,8 @@ resetLavaLevel();
 let activePointerId: number | null = null;
 let dragAnchor: Vec2Interface = { x: 0, y: 0 };
 let pullPos: Vec2Interface = { x: 0, y: 0 };
+let mouseWorldPos: Vec2Interface | null = null;
+let mouseOnCanvas = false;
 
 function ballPos(): Vec2Interface {
   return getBallPosition();
@@ -404,9 +410,20 @@ window.addEventListener('keydown', (e) => {
   togglePause();
 });
 
+canvas.addEventListener('pointerenter', (e) => {
+  mouseOnCanvas = true;
+  mouseWorldPos = pointerPos(e);
+});
+
+canvas.addEventListener('pointerleave', () => {
+  mouseOnCanvas = false;
+});
+
 canvas.addEventListener('pointerdown', (e) => {
+  mouseOnCanvas = true;
+  mouseWorldPos = pointerPos(e);
   if (paused || gameOver || ballFlying) return;
-  const click = pointerPos(e);
+  const click = mouseWorldPos;
   dragging = true;
   activePointerId = e.pointerId;
   dragAnchor = { ...click };
@@ -415,8 +432,10 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  mouseOnCanvas = true;
+  mouseWorldPos = pointerPos(e);
   if (!dragging || e.pointerId !== activePointerId) return;
-  pullPos = clampPull(dragAnchor, pointerPos(e));
+  pullPos = clampPull(dragAnchor, mouseWorldPos);
 });
 
 function endDrag(e: PointerEvent): void {
@@ -548,6 +567,13 @@ function trySettleAfterFlight(): void {
     return;
   }
 
+  if (isBallGrounded() && isStandingOnIce(getPlatforms())) {
+    ballFlying = false;
+    flyingTime = 0;
+    settleStableTime = 0;
+    return;
+  }
+
   if (flyingTime >= gameConfig.maxGroundedFlightTime && isBallGrounded()) {
     settle();
     return;
@@ -570,7 +596,7 @@ function trySettleAfterFlight(): void {
     nudgeUnstablePlayer();
     settleStableTime = 0;
 
-    if (flyingTime >= gameConfig.maxGroundedFlightTime && onPlatform) {
+    if (flyingTime >= gameConfig.maxGroundedFlightTime && onPlatform && !isStandingOnIce(getPlatforms())) {
       settle();
     }
     return;
@@ -595,28 +621,61 @@ function trySettleAfterFlight(): void {
   settleStableTime = 0;
 }
 
-function shouldCarryPlayerOnMovingPlatform(): boolean {
-  if (gameOver || playerInLava) return false;
-  if (ballFlying) {
-    return isBallGrounded() && isBallOnPlatformSurface(getPlatforms());
+function trySettleWhileSliding(frameDt: number): void {
+  if (ballFlying || gameOver || playerInLava || dragging) return;
+  if (isBallStatic()) return;
+  if (!isBallGrounded()) {
+    settleStableTime = 0;
+    return;
   }
-  return true;
+  if (isStandingOnIce(getPlatforms())) {
+    settleStableTime = 0;
+    return;
+  }
+  if (!canSettleOnCurrentSupport(getPlatforms())) {
+    settleStableTime = 0;
+    return;
+  }
+  if (!isStableOrientation(getBallAngle())) {
+    nudgeUnstablePlayer();
+    settleStableTime = 0;
+    return;
+  }
+  if (!isBallSettled()) {
+    settleStableTime = 0;
+    return;
+  }
+
+  settleStableTime += frameDt;
+  if (settleStableTime >= gameConfig.settleStableTime) {
+    settle();
+  }
+}
+
+function shouldCarryPlayerOnMovingPlatform(
+  platformList: ReturnType<typeof getPlatforms>,
+): boolean {
+  if (gameOver || playerInLava) return false;
+  return getCarrySupportPlatform(platformList) !== null;
 }
 
 function updateMovingPlatformsAndCarry(): void {
-  const deltas = updateMovingPlatforms(getPlatforms(), animTime);
+  const platforms = getPlatforms();
+  const supportBeforeMove = shouldCarryPlayerOnMovingPlatform(platforms)
+    ? getCarrySupportPlatform(platforms)
+    : null;
+  const supportId = supportBeforeMove?.id;
+
+  const deltas = updateMovingPlatforms(platforms, animTime);
   if (deltas.size === 0) return;
 
-  updatePlatformBodyPositions(getPlatforms());
+  updatePlatformBodyPositions(platforms);
   translateObstaclesOnPlatforms(deltas);
   translateObstacleBodies(deltas);
 
-  if (!shouldCarryPlayerOnMovingPlatform()) return;
+  if (supportId === undefined) return;
 
-  const support = getPlayerSupportPlatform(getPlatforms());
-  if (support?.id === undefined) return;
-
-  const deltaX = deltas.get(support.id);
+  const deltaX = deltas.get(supportId);
   if (deltaX) {
     translatePlayerHorizontal(deltaX);
   }
@@ -626,7 +685,7 @@ function update(frameDt: number): void {
   if (paused) return;
 
   animTime += frameDt;
-  updateLava(frameDt);
+  updateLava(frameDt, climbHeightM);
   updateLavaSplash(frameDt);
   updateMilestoneUi(frameDt);
 
@@ -661,7 +720,9 @@ function update(frameDt: number): void {
   }
 
   updateMovingPlatformsAndCarry();
+  updatePlayerSurfaceFriction(getPlatforms());
   stepPhysics(frameDt);
+  trySettleWhileSliding(frameDt);
   handleObstaclesInLava();
   updateCameraZone();
   trackClimbHeight();
@@ -708,13 +769,48 @@ function drawObstacles(inLavaLayer: 'above' | 'below'): void {
   }
 }
 
+function normalizeGaze(x: number, y: number): Vec2Interface {
+  const length = Math.hypot(x, y);
+  if (length < 0.001) return { x: 0, y: -1 };
+  return { x: x / length, y: y / length };
+}
+
+function playerEyeGaze(flying: boolean): PlayerEyeGazeInterface {
+  if (flying) {
+    const centered = { x: 0, y: 0 };
+    return { left: centered, right: centered };
+  }
+
+  if (mouseOnCanvas && mouseWorldPos) {
+    const pos = ballDisplayPos();
+    const gaze = normalizeGaze(mouseWorldPos.x - pos.x, mouseWorldPos.y - pos.y);
+    return { left: gaze, right: gaze };
+  }
+
+  const idle = { x: 0, y: -1 };
+  return { left: idle, right: idle };
+}
+
+function dragShakeOffset(): Vec2Interface {
+  if (!dragging) return { x: 0, y: 0 };
+
+  const t = animTime;
+  return {
+    x: Math.sin(t * 52) > 0 ? 1 : -1,
+    y: Math.cos(t * 47) > 0 ? 1 : -1,
+  };
+}
+
 function drawPlayer(): void {
   const display = ballDisplayPos();
+  const shake = dragShakeOffset();
   const size = gameConfig.ballRadius * 2;
   const angle = getBallAngle();
   const inLava = playerInLava;
-  const flying = ballFlying || gameOver;
-  const canDrag = !flying && !inLava;
+  const flying = ballFlying && !gameOver;
+
+  const squinting = dragging;
+  const eyesOpen = squinting ? false : (flying || isPlayerEyesOpen(animTime));
 
   drawPixelCube(
     ctx,
@@ -723,8 +819,12 @@ function drawPlayer(): void {
     size,
     angle,
     inLava ? 'lava' : 'player',
-    !canDrag && !inLava,
-    isPlayerEyesOpen(animTime),
+    false,
+    eyesOpen,
+    inLava || squinting ? undefined : playerEyeGaze(flying),
+    flying,
+    shake.x,
+    shake.y,
   );
 }
 
@@ -783,7 +883,7 @@ function draw(): void {
 
   if (gameConfig.showDeadZone) {
     const zone = deadZoneScreenBounds();
-    displayCtx.strokeStyle = 'rgba(255, 248, 238, 0.55)';
+    displayCtx.strokeStyle = 'rgba(194, 229, 233, 0.55)';
     displayCtx.lineWidth = 2;
     displayCtx.setLineDash([10, 8]);
     displayCtx.strokeRect(

@@ -11,6 +11,7 @@ export interface PlatformInterface {
   y: number;
   width: number;
   height: number;
+  typeId?: string;
   motion?: PlatformMotionInterface;
 }
 

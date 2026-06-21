@@ -54,7 +54,7 @@ export function drawMilestones(
     ctx.lineTo(right, y);
     ctx.stroke();
 
-    ctx.fillText(`${heightM}M`, labelX, y + labelOffsetY);
+    ctx.fillText(`${heightM} m`, labelX, y + labelOffsetY);
   }
 
   ctx.setLineDash([]);

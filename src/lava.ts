@@ -3,6 +3,18 @@ import { gameConfig } from './config';
 let lavaLevelY = 0;
 let wavePhase = 0;
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+export function lavaRiseSpeedAtHeight(climbHeightM: number): number {
+  const { minRiseSpeed, maxRiseSpeed, fullSpeedAtHeightM } = gameConfig.lava;
+  if (fullSpeedAtHeightM <= 0) return maxRiseSpeed;
+
+  const progress = clamp(climbHeightM / fullSpeedAtHeightM, 0, 1);
+  return minRiseSpeed + (maxRiseSpeed - minRiseSpeed) * progress;
+}
+
 export interface LavaStateInterface {
   levelY: number;
   wavePhase: number;
@@ -22,8 +34,8 @@ export function resetLava(visibleWorldBottomY: number): void {
   wavePhase = 0;
 }
 
-export function updateLava(dt: number): void {
-  lavaLevelY -= gameConfig.lava.riseSpeed * dt;
+export function updateLava(dt: number, climbHeightM: number): void {
+  lavaLevelY -= lavaRiseSpeedAtHeight(climbHeightM) * dt;
   wavePhase += gameConfig.lava.waveSpeed * dt;
 }
 

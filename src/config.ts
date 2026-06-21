@@ -10,16 +10,45 @@ export interface LavaSplashConfigInterface {
   gravity: number;
   airDrag: number;
   maxLifetime: number;
+  fineDropletCount: number;
+  fineMinRadius: number;
+  fineMaxRadius: number;
+  fineMinUpSpeed: number;
+  fineMaxUpSpeed: number;
+  fineSpreadAngle: number;
 }
 
 export interface LavaConfigInterface {
   startVisibleHeight: number;
-  riseSpeed: number;
+  minRiseSpeed: number;
+  maxRiseSpeed: number;
+  fullSpeedAtHeightM: number;
   waveAmplitude: number;
   waveFrequency: number;
   waveSpeed: number;
   surfaceColor: string;
   splash: LavaSplashConfigInterface;
+}
+
+export interface PlatformTypeVisualConfigInterface {
+  top: string;
+  topMoving: string;
+  face: string;
+  checker: string;
+  shadow: string;
+  edge: string;
+  sparkleTop?: boolean;
+}
+
+export interface PlatformTypeConfigInterface {
+  id: string;
+  isDefault?: boolean;
+  spawnChance?: number;
+  friction: number;
+  frictionStatic: number;
+  playerFriction: number;
+  skipSettle?: boolean;
+  visual: PlatformTypeVisualConfigInterface;
 }
 
 export interface PlatformGeneratorConfigInterface {
@@ -52,6 +81,7 @@ export interface PlatformGeneratorConfigInterface {
 }
 
 export interface ObstaclesConfigInterface {
+  enabled: boolean;
   spawnChance: number;
   sizeScale: number;
   platformEdgeInset: number;
@@ -99,6 +129,8 @@ export interface PixelArtConfigInterface {
   starTwinkleSpeed: number;
   playerBlinkIntervalS: number;
   playerBlinkDurationS: number;
+  playerDoubleBlinkChance: number;
+  playerDoubleBlinkGapS: number;
 }
 
 export interface GameConfigInterface {
@@ -139,6 +171,7 @@ export interface GameConfigInterface {
   showPullLimit: boolean;
   settleDelay: number;
   platformGenerator: PlatformGeneratorConfigInterface;
+  platformTypes: PlatformTypeConfigInterface[];
   heightMetersScale: number;
   milestone: MilestoneConfigInterface;
   playerLaunchSpin: number;
@@ -181,7 +214,9 @@ export const gameConfig: GameConfigInterface = {
   cameraDeadZoneHeightRatio: 0.25,
   lava: {
     startVisibleHeight: 90,
-    riseSpeed: 50,
+    minRiseSpeed: 30,
+    maxRiseSpeed: 60,
+    fullSpeedAtHeightM: 350,
     waveAmplitude: 8,
     waveFrequency: 0.022,
     waveSpeed: 3.2,
@@ -198,9 +233,16 @@ export const gameConfig: GameConfigInterface = {
       gravity: 2100,
       airDrag: 0.992,
       maxLifetime: 2.2,
+      fineDropletCount: 12,
+      fineMinRadius: 2,
+      fineMaxRadius: 5,
+      fineMinUpSpeed: 700,
+      fineMaxUpSpeed: 1400,
+      fineSpreadAngle: 0.18,
     },
   },
   obstacles: {
+    enabled: true,
     spawnChance: 0.42,
     sizeScale: 0.5,
     platformEdgeInset: 6,
@@ -216,9 +258,9 @@ export const gameConfig: GameConfigInterface = {
     restitution: 0.45,
     stableSupportCenterRatio: 0.55,
     supportSurfaceTolerance: 12,
-    fillColorTop: '#c9a87a',
-    fillColorBottom: '#5a4038',
-    strokeColor: '#3d2a24',
+    fillColorTop: '#e6f2f5',
+    fillColorBottom: '#523242',
+    strokeColor: '#3a2438',
   },
   movingPlatforms: {
     spawnChance: 0.28,
@@ -229,9 +271,43 @@ export const gameConfig: GameConfigInterface = {
     boundsMinX: -480,
     boundsMaxX: 480,
   },
+  platformTypes: [
+    {
+      id: 'ground',
+      isDefault: true,
+      friction: 0.65,
+      frictionStatic: 0.65,
+      playerFriction: 0.35,
+      visual: {
+        top: '#e6f2f5',
+        topMoving: '#f4fafc',
+        face: '#a67c6a',
+        checker: '#523242',
+        shadow: '#3a2438',
+        edge: '#b8d0d8',
+      },
+    },
+    {
+      id: 'ice',
+      spawnChance: 0.1,
+      friction: 0,
+      frictionStatic: 0,
+      playerFriction: 0.01,
+      skipSettle: true,
+      visual: {
+        top: '#eaf8ff',
+        topMoving: '#f4fcff',
+        face: '#c8e8f8',
+        checker: '#9fd0ea',
+        shadow: '#78a8c8',
+        edge: '#dff4ff',
+        sparkleTop: true,
+      },
+    },
+  ],
   gridParallax: 0.4,
   gridStep: 120,
-  gridColor: 'rgba(42, 53, 80, 0.38)',
+  gridColor: 'rgba(130, 150, 170, 0.28)',
   gridLineWidth: 1,
   showTrajectory: true,
   trajectoryUntilFirstCollision: true,
@@ -248,7 +324,7 @@ export const gameConfig: GameConfigInterface = {
     minWidth: 140,
     maxWidth: 220,
     minHeight: 22,
-    maxHeight: 28,
+    maxHeight: 84,
     minX: -480,
     maxX: 480,
     maxHorizontalReach: 340,
@@ -264,15 +340,15 @@ export const gameConfig: GameConfigInterface = {
     reachabilityPowerRatios: [0.8, 1],
     landingSurfaceTolerance: 14,
     launchPointInset: 6,
-    movingPlatformsEnabled: false,
+    movingPlatformsEnabled: true,
   },
   heightMetersScale: 10,
   milestone: {
     intervalM: 100,
-    lineColor: '#fff8ee',
+    lineColor: '#c2e5e9',
     lineWidth: 2,
     dash: [8, 8],
-    labelColor: '#ffd4a8',
+    labelColor: '#a8c0c9',
     labelOffsetY: -6,
     hudPulseDurationMs: 450,
     popupDurationMs: 1100,
@@ -286,7 +362,7 @@ export const gameConfig: GameConfigInterface = {
   playerIdlePulseSpeed: 0.733,
   playerIdlePulseScale: 0.045,
   playerGlowBlur: 0,
-  playerGlowColor: 'rgba(127, 208, 255, 0.55)',
+  playerGlowColor: 'rgba(194, 229, 233, 0.45)',
   pixelArt: {
     renderScale: 0.25,
     snapUnit: 4,
@@ -297,5 +373,7 @@ export const gameConfig: GameConfigInterface = {
     starTwinkleSpeed: 2.4,
     playerBlinkIntervalS: 3.6,
     playerBlinkDurationS: 0.12,
+    playerDoubleBlinkChance: 0.28,
+    playerDoubleBlinkGapS: 0.07,
   },
 };

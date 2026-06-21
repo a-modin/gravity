@@ -1,7 +1,8 @@
 import { gameConfig } from './config';
-import { maybeAssignPlatformMotion } from './platformMotion';
+import { maybeAssignPlatformMotion, platformVerticalOverlap, sweptHorizontalExtents } from './platformMotion';
 import { simulateTrajectory, type Vec2Interface } from './physics';
 import { removeObstaclesBelow, resetObstacles, spawnObstaclesForPlatforms } from './obstacles';
+import { rollPlatformTypeId } from './platformTypes';
 import { startPlatform, type PlatformInterface } from './platforms';
 
 let platforms: PlatformInterface[] = [startPlatform];
@@ -117,13 +118,14 @@ function isReachable(
 
 function overlapsExisting(candidate: PlatformInterface): boolean {
   const margin = generatorConfig().overlapMargin;
+  const candidateLeft = candidate.x;
+  const candidateRight = candidate.x + candidate.width;
 
   return platforms.some((platform) => {
-    const yOverlap = candidate.y < platform.y + platform.height + margin
-      && candidate.y + candidate.height > platform.y - margin;
-    const xOverlap = candidate.x < platform.x + platform.width + margin
-      && candidate.x + candidate.width > platform.x - margin;
-    return yOverlap && xOverlap;
+    if (!platformVerticalOverlap(candidate, platform, margin)) return false;
+
+    const { left, right } = sweptHorizontalExtents(platform);
+    return candidateLeft < right + margin && candidateRight > left - margin;
   });
 }
 
@@ -140,10 +142,12 @@ function tooCloseHorizontally(
 
 function assignPlatformIdentity(platform: PlatformInterface): PlatformInterface {
   platform.id = nextPlatformId++;
-  if (generatorConfig().movingPlatformsEnabled) {
-    maybeAssignPlatformMotion(platform);
-  }
   return platform;
+}
+
+function maybeAssignPlatformType(platform: PlatformInterface): void {
+  if (platform.id === startPlatform.id) return;
+  platform.typeId = rollPlatformTypeId();
 }
 
 function buildCandidateAtY(
@@ -361,6 +365,17 @@ function addBandPlatforms(bandPlatforms: PlatformInterface[]): void {
   if (bandPlatforms.length === 0) return;
   const prepared = bandPlatforms.map(assignPlatformIdentity);
   platforms.push(...prepared);
+
+  for (const platform of prepared) {
+    maybeAssignPlatformType(platform);
+  }
+
+  if (generatorConfig().movingPlatformsEnabled) {
+    for (const platform of prepared) {
+      maybeAssignPlatformMotion(platform, platforms);
+    }
+  }
+
   registerReachablePlatforms(prepared);
   spawnObstaclesForPlatforms(prepared);
 }

@@ -14,12 +14,44 @@ interface SplashDropletInterface {
   vy: number;
   radius: number;
   life: number;
+  kind: 'main' | 'fine';
 }
 
 let droplets: SplashDropletInterface[] = [];
 
 function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
+}
+
+function pushSplashDroplets(
+  contact: Vec2Interface,
+  speedBoost: number,
+  kind: 'main' | 'fine',
+  count: number,
+  minRadius: number,
+  maxRadius: number,
+  minUpSpeed: number,
+  maxUpSpeed: number,
+  spreadAngle: number,
+  lifetime: number,
+): void {
+  for (let i = 0; i < count; i++) {
+    const angle = -Math.PI / 2 + randomBetween(-spreadAngle, spreadAngle);
+    const speed = randomBetween(
+      minUpSpeed + speedBoost * 0.25,
+      maxUpSpeed + speedBoost,
+    );
+
+    droplets.push({
+      x: contact.x,
+      y: contact.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      radius: randomBetween(minRadius, maxRadius),
+      life: lifetime,
+      kind,
+    });
+  }
 }
 
 export function cubeLavaContactPoint(
@@ -55,23 +87,31 @@ export function spawnLavaSplash(contact: Vec2Interface, impactSpeed: number): vo
     impactSpeed * splash.impactSpeedScale,
   );
 
-  for (let i = 0; i < splash.dropletCount; i++) {
-    const angle = -Math.PI / 2 + randomBetween(-splash.spreadAngle, splash.spreadAngle);
-    const speed = randomBetween(
-      splash.minUpSpeed + speedBoost * 0.25,
-      splash.maxUpSpeed + speedBoost,
-    );
-    const radius = randomBetween(splash.minRadius, splash.maxRadius);
+  pushSplashDroplets(
+    contact,
+    speedBoost,
+    'main',
+    splash.dropletCount,
+    splash.minRadius,
+    splash.maxRadius,
+    splash.minUpSpeed,
+    splash.maxUpSpeed,
+    splash.spreadAngle,
+    splash.maxLifetime,
+  );
 
-    droplets.push({
-      x: contact.x,
-      y: contact.y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      radius,
-      life: splash.maxLifetime,
-    });
-  }
+  pushSplashDroplets(
+    contact,
+    speedBoost,
+    'fine',
+    splash.fineDropletCount,
+    splash.fineMinRadius,
+    splash.fineMaxRadius,
+    splash.fineMinUpSpeed,
+    splash.fineMaxUpSpeed,
+    splash.fineSpreadAngle,
+    splash.maxLifetime,
+  );
 }
 
 export function resetLavaSplash(): void {
@@ -106,6 +146,7 @@ export function drawLavaSplash(ctx: CanvasRenderingContext2D): void {
   for (const droplet of droplets) {
     const t = droplet.life / gameConfig.lava.splash.maxLifetime;
     const alpha = Math.min(1, t * 1.2);
-    drawPixelSplash(ctx, droplet.x, droplet.y, droplet.radius * 1.6, alpha);
+    const sizeScale = droplet.kind === 'fine' ? 1.15 : 1.6;
+    drawPixelSplash(ctx, droplet.x, droplet.y, droplet.radius * sizeScale, alpha);
   }
 }
