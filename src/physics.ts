@@ -5,6 +5,7 @@ import { getObstacles, removeObstacleIds } from './obstacles';
 import { isCubeFullySubmerged, isPlayerInLava } from './lava';
 import { cubeLavaContactPoint } from './lavaSplash';
 import { getPlatformType, platformTypeSkipsSettle } from './platformTypes';
+import { playObstacleDropSound, playObstacleHitSound, playPlatformHitSound } from './sounds';
 import { startPlatform, type PlatformInterface } from './platforms';
 
 const { Bodies, Body, Engine, Events, Query, World } = Matter;
@@ -136,6 +137,115 @@ function addObstacleToWorld(
   World.add(context.engine.world, body);
 }
 
+function isPlatformBody(body: Matter.Body): boolean {
+  return body.label.startsWith('platform-');
+}
+
+function isObstacleBody(body: Matter.Body): boolean {
+  return body.label === 'obstacle';
+}
+
+const HIT_SOUND_COOLDOWN_MS = 45;
+let lastPlatformHitSoundAt = 0;
+let lastObstacleHitSoundAt = 0;
+let lastObstacleDropSoundAt = 0;
+
+function getPairImpactSpeed(pair: Matter.Pair, movingBody: Matter.Body): number {
+  const { bodyA, bodyB, collision } = pair;
+  const other = movingBody === bodyA ? bodyB : bodyA;
+  const relativeVx = movingBody.velocity.x - other.velocity.x;
+  const relativeVy = movingBody.velocity.y - other.velocity.y;
+
+  if (collision.normal) {
+    const normalImpact = Math.abs(
+      relativeVx * collision.normal.x + relativeVy * collision.normal.y,
+    );
+    return normalImpact * MATTER_VELOCITY_SCALE;
+  }
+
+  return Body.getSpeed(movingBody) * MATTER_VELOCITY_SCALE;
+}
+
+function getCollisionImpactSpeed(pair: Matter.Pair): number {
+  return getPairImpactSpeed(pair, gameContext.ball);
+}
+
+function hitVolumeScale(
+  impactSpeed: number,
+  config: typeof gameConfig.platformHitSound,
+): number | null {
+  const { minImpactSpeed, maxImpactSpeed, minVolumeRatio } = config;
+  if (impactSpeed < minImpactSpeed) return null;
+
+  const linear = clamp(
+    (impactSpeed - minImpactSpeed) / (maxImpactSpeed - minImpactSpeed),
+    0,
+    1,
+  );
+  return minVolumeRatio + linear * (1 - minVolumeRatio);
+}
+
+function canPlayHitSound(lastPlayedAt: number): boolean {
+  return performance.now() - lastPlayedAt >= HIT_SOUND_COOLDOWN_MS;
+}
+
+function tryPlayObstacleDropSound(pair: Matter.Pair, bodyA: Matter.Body, bodyB: Matter.Body): void {
+  const aObstacle = isObstacleBody(bodyA);
+  const bObstacle = isObstacleBody(bodyB);
+  const aPlatform = isPlatformBody(bodyA);
+  const bPlatform = isPlatformBody(bodyB);
+
+  let movingBody: Matter.Body | null = null;
+  if (aObstacle && bPlatform) movingBody = bodyA;
+  else if (bObstacle && aPlatform) movingBody = bodyB;
+  else if (aObstacle && bObstacle) {
+    movingBody = Body.getSpeed(bodyA) >= Body.getSpeed(bodyB) ? bodyA : bodyB;
+  }
+  if (!movingBody) return;
+
+  const impactSpeed = getPairImpactSpeed(pair, movingBody);
+  const volumeScale = hitVolumeScale(impactSpeed, gameConfig.obstacleDropSound);
+  if (volumeScale === null || !canPlayHitSound(lastObstacleDropSoundAt)) return;
+
+  lastObstacleDropSoundAt = performance.now();
+  playObstacleDropSound(volumeScale);
+}
+
+function bindCollisionSounds(engine: Matter.Engine): void {
+  Events.on(engine, 'collisionStart', (event) => {
+    const ball = gameContext.ball;
+
+    for (const pair of event.pairs) {
+      const { bodyA, bodyB } = pair;
+
+      if (bodyA === ball || bodyB === ball) {
+        const other = bodyA === ball ? bodyB : bodyA;
+        const impactSpeed = getCollisionImpactSpeed(pair);
+
+        if (isPlatformBody(other)) {
+          const volumeScale = hitVolumeScale(impactSpeed, gameConfig.platformHitSound);
+          if (volumeScale !== null && canPlayHitSound(lastPlatformHitSoundAt)) {
+            lastPlatformHitSoundAt = performance.now();
+            playPlatformHitSound(volumeScale);
+          }
+          continue;
+        }
+
+        if (isObstacleBody(other)) {
+          const volumeScale = hitVolumeScale(impactSpeed, gameConfig.obstacleHitSound);
+          if (volumeScale !== null && canPlayHitSound(lastObstacleHitSoundAt)) {
+            lastObstacleHitSoundAt = performance.now();
+            playObstacleHitSound(volumeScale);
+          }
+        }
+        continue;
+      }
+
+      tryPlayObstacleDropSound(pair, bodyA, bodyB);
+    }
+  });
+}
+
 function createContext(
   platformList: PlatformInterface[],
   obstacleList: ObstacleInterface[] = [],
@@ -163,6 +273,8 @@ function createContext(
   for (const obstacle of obstacleList) {
     addObstacleToWorld(context, obstacle);
   }
+
+  bindCollisionSounds(engine);
 
   return context;
 }
@@ -256,6 +368,8 @@ export interface ObstacleRenderStateInterface {
 }
 
 export interface ObstacleLavaEventInterface {
+  x: number;
+  y: number;
   contact: Vec2Interface;
   impactSpeed: number;
 }
@@ -373,6 +487,8 @@ export function updateObstaclesInLava(): ObstacleLavaEventInterface[] {
     };
 
     events.push({
+      x,
+      y,
       contact: cubeLavaContactPoint(x, y, half, angle),
       impactSpeed: Math.hypot(velocity.x, velocity.y),
     });
@@ -520,6 +636,9 @@ export function resetGamePhysics(
   obstacleBodyById.clear();
   obstacleSizeById.clear();
   obstaclesInLava.clear();
+  lastPlatformHitSoundAt = 0;
+  lastObstacleHitSoundAt = 0;
+  lastObstacleDropSoundAt = 0;
   gameContext = createContext(platformList, obstacleList);
 }
 
@@ -588,15 +707,45 @@ export function isBallStatic(): boolean {
   return gameContext.ball.isStatic;
 }
 
+function settledBallRestsOnPlatform(platform: PlatformInterface): boolean {
+  const body = gameContext.ball;
+  const half = gameConfig.ballRadius;
+  const bottom = body.position.y + playerBottomExtent(body.angle);
+
+  if (bottom < platform.y - 6) return false;
+  if (bottom > platform.y + half + 8) return false;
+
+  const footLeft = body.position.x - half;
+  const footRight = body.position.x + half;
+  return footRight > platform.x && footLeft < platform.x + platform.width;
+}
+
 export function getCarrySupportPlatform(platformList: PlatformInterface[]): PlatformInterface | null {
   const body = gameContext.ball;
-  return findSupportPlatform(
+  const direct = findSupportPlatform(
     platformList,
     body.position.x,
     body.position.y,
     body.angle,
     26,
   );
+  if (direct) return direct;
+
+  if (!body.isStatic) return null;
+
+  let best: PlatformInterface | null = null;
+  let bestDistance = Infinity;
+  for (const platform of platformList) {
+    if (!settledBallRestsOnPlatform(platform)) continue;
+
+    const distance = Math.abs(body.position.y + playerBottomExtent(body.angle) - platform.y);
+    if (distance < bestDistance) {
+      best = platform;
+      bestDistance = distance;
+    }
+  }
+
+  return best;
 }
 
 export function translatePlayerHorizontal(dx: number): void {

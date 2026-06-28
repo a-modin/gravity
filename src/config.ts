@@ -133,6 +133,12 @@ export interface PixelArtConfigInterface {
   playerDoubleBlinkGapS: number;
 }
 
+export interface ImpactSoundConfigInterface {
+  minImpactSpeed: number;
+  maxImpactSpeed: number;
+  minVolumeRatio: number;
+}
+
 export interface GameConfigInterface {
   gravity: number;
   restitution: number;
@@ -143,6 +149,7 @@ export interface GameConfigInterface {
   maxPull: number;
   pullBottomPadding: number;
   minLaunchPull: number;
+  pullSoundMinPull: number;
   minMaxPull: number;
   settleVelocityY: number;
   settleVelocityX: number;
@@ -185,6 +192,9 @@ export interface GameConfigInterface {
   playerGlowBlur: number;
   playerGlowColor: string;
   pixelArt: PixelArtConfigInterface;
+  platformHitSound: ImpactSoundConfigInterface;
+  obstacleHitSound: ImpactSoundConfigInterface;
+  obstacleDropSound: ImpactSoundConfigInterface;
 }
 
 export const gameConfig: GameConfigInterface = {
@@ -197,6 +207,7 @@ export const gameConfig: GameConfigInterface = {
   maxPull: 110,
   pullBottomPadding: 24,
   minLaunchPull: 8,
+  pullSoundMinPull: 4,
   minMaxPull: 40,
   settleVelocityY: 60,
   settleVelocityX: 30,
@@ -289,7 +300,7 @@ export const gameConfig: GameConfigInterface = {
     },
     {
       id: 'ice',
-      spawnChance: 0.1,
+      spawnChance: 0,
       friction: 0,
       frictionStatic: 0,
       playerFriction: 0.01,
@@ -375,5 +386,20 @@ export const gameConfig: GameConfigInterface = {
     playerBlinkDurationS: 0.12,
     playerDoubleBlinkChance: 0.28,
     playerDoubleBlinkGapS: 0.07,
+  },
+  platformHitSound: {
+    minImpactSpeed: 60,
+    maxImpactSpeed: 560,
+    minVolumeRatio: 0.3,
+  },
+  obstacleHitSound: {
+    minImpactSpeed: 50,
+    maxImpactSpeed: 480,
+    minVolumeRatio: 0.3,
+  },
+  obstacleDropSound: {
+    minImpactSpeed: 35,
+    maxImpactSpeed: 300,
+    minVolumeRatio: 0.25,
   },
 };

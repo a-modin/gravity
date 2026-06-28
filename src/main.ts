@@ -22,6 +22,7 @@ import {
   type PlayerEyeGazeInterface,
 } from './pixelArt';
 import { getPlatforms, resetPlatformGenerator, trackPlatformGeneratorHeight, updatePlatformGenerator } from './platformGenerator';
+import { playMilestoneCrossSound, playObstacleLavaBurnSound, playPlayerLavaBurnSound, playSlingPullSound, playSlingReleaseSound, preloadGameSounds, resumeAudioContext, stopSlingPullSound } from './sounds';
 import { updateMovingPlatforms } from './platformMotion';
 import { startBallPosition } from './platforms';
 import {
@@ -74,6 +75,7 @@ let width = 0;
 let height = 0;
 let maxPull = gameConfig.maxPull;
 let dragging = false;
+let pullSoundPlayed = false;
 let gameOver = false;
 let gameOverOverlayTimer = 0;
 let ballFlying = false;
@@ -90,6 +92,8 @@ resetPlatformGenerator();
 const startPos = startBallPosition(gameConfig.ballRadius);
 resetGamePhysics(getPlatforms(), getObstacles());
 resetBallPosition(startPos);
+
+void preloadGameSounds();
 
 const cameraZone = {
   x: startPos.x,
@@ -155,6 +159,7 @@ function resetClimbHeight(baselineY: number): void {
 }
 
 function triggerMilestoneCelebration(meters: number): void {
+  playMilestoneCrossSound();
   milestonePopupEl.textContent = `${meters} m`;
   milestonePopupEl.hidden = false;
   milestonePopupEl.classList.remove('is-active');
@@ -260,6 +265,22 @@ interface ScreenRectInterface {
   bottom: number;
 }
 
+const OBSTACLE_LAVA_SOUND_VIEW_MARGIN = 200;
+
+function visibleWorldBounds(margin = 0): ScreenRectInterface {
+  return {
+    left: cameraZone.x - width / 2 - margin,
+    right: cameraZone.x + width / 2 + margin,
+    top: cameraZone.y - height * gameConfig.cameraFocusRatio - margin,
+    bottom: cameraZone.y + height * (1 - gameConfig.cameraFocusRatio) + margin,
+  };
+}
+
+function isNearVisibleWorldArea(x: number, y: number, margin = OBSTACLE_LAVA_SOUND_VIEW_MARGIN): boolean {
+  const bounds = visibleWorldBounds(margin);
+  return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
+}
+
 function deadZoneScreenBounds(): ScreenRectInterface {
   const focusX = width / 2;
   const focusY = height * gameConfig.cameraFocusRatio;
@@ -327,6 +348,7 @@ function cancelDrag(): void {
   if (!dragging) return;
   dragging = false;
   activePointerId = null;
+  stopSlingPullSound();
 }
 
 function setPaused(value: boolean): void {
@@ -350,6 +372,7 @@ function restartGame(): void {
   gameOverEl.hidden = true;
   dragging = false;
   activePointerId = null;
+  stopSlingPullSound();
   physicsAccumulator = 0;
   ballFlying = false;
   flyingTime = 0;
@@ -380,6 +403,7 @@ function rewindToCheckpoint(): void {
   gameOverEl.hidden = true;
   dragging = false;
   activePointerId = null;
+  stopSlingPullSound();
   physicsAccumulator = 0;
   ballFlying = false;
   flyingTime = 0;
@@ -423,8 +447,10 @@ canvas.addEventListener('pointerdown', (e) => {
   mouseOnCanvas = true;
   mouseWorldPos = pointerPos(e);
   if (paused || gameOver || ballFlying) return;
+  resumeAudioContext();
   const click = mouseWorldPos;
   dragging = true;
+  pullSoundPlayed = false;
   activePointerId = e.pointerId;
   dragAnchor = { ...click };
   pullPos = { ...click };
@@ -436,6 +462,14 @@ canvas.addEventListener('pointermove', (e) => {
   mouseWorldPos = pointerPos(e);
   if (!dragging || e.pointerId !== activePointerId) return;
   pullPos = clampPull(dragAnchor, mouseWorldPos);
+  if (!pullSoundPlayed) {
+    const dx = dragAnchor.x - pullPos.x;
+    const dy = dragAnchor.y - pullPos.y;
+    if (Math.hypot(dx, dy) >= gameConfig.pullSoundMinPull) {
+      pullSoundPlayed = true;
+      playSlingPullSound();
+    }
+  }
 });
 
 function endDrag(e: PointerEvent): void {
@@ -462,6 +496,7 @@ function launch(): void {
     setBallPosition(launchPos);
     return;
   }
+  playSlingReleaseSound();
   setBallPosition(launchPos);
   setBallFlying({
     x: dx * gameConfig.launchPower,
@@ -508,11 +543,15 @@ function handleLavaContact(): void {
   if (!isPlayerTouchingLava() || playerInLava) return;
   playerInLava = true;
   disablePlayerCollisions();
+  playPlayerLavaBurnSound();
 }
 
 function handleObstaclesInLava(): void {
   const events = updateObstaclesInLava();
   for (const event of events) {
+    if (isNearVisibleWorldArea(event.x, event.y)) {
+      playObstacleLavaBurnSound();
+    }
     spawnLavaSplash(event.contact, event.impactSpeed);
   }
 }
