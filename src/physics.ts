@@ -4,7 +4,7 @@ import type { ObstacleInterface } from './obstacles';
 import { getObstacles, removeObstacleIds } from './obstacles';
 import { isCubeFullySubmerged, isPlayerInLava } from './lava';
 import { cubeLavaContactPoint } from './lavaSplash';
-import { getPlatformType, platformTypeSkipsSettle } from './platformTypes';
+import { getDefaultPlatformType, getPlatformType, platformTypeSkipsSettle } from './platformTypes';
 import { playObstacleDropSound, playObstacleHitSound, playPlatformHitSound } from './sounds';
 import { startPlatform, type PlatformInterface } from './platforms';
 
@@ -59,6 +59,7 @@ interface PhysicsContextInterface {
 
 function platformBody(platform: PlatformInterface): Matter.Body {
   const type = getPlatformType(platform.typeId);
+  const friction = resolvePlatformSurfaceFriction(platform.typeId);
 
   return Bodies.rectangle(
     platform.x + platform.width / 2,
@@ -67,12 +68,25 @@ function platformBody(platform: PlatformInterface): Matter.Body {
     platform.height,
     {
       isStatic: true,
-      friction: type.friction,
-      frictionStatic: type.frictionStatic,
+      friction,
+      frictionStatic: friction,
       restitution: gameConfig.restitution,
       label: `platform-${type.id}`,
     },
   );
+}
+
+let surfaceWet = false;
+
+export function setSurfaceWet(wet: boolean): void {
+  surfaceWet = wet;
+}
+
+function resolvePlatformSurfaceFriction(typeId?: string): number {
+  const type = getPlatformType(typeId);
+  if (type.skipSettle) return type.friction;
+  if (surfaceWet) return gameConfig.rain.wetSurfaceFriction;
+  return type.friction;
 }
 
 const DEFAULT_COLLISION_FILTER = {
@@ -99,7 +113,7 @@ function createPlayerBody(x: number, y: number): Matter.Body {
   const size = playerSize();
   return Bodies.rectangle(x, y, size, size, {
     restitution: gameConfig.restitution,
-    friction: 0.35,
+    friction: getDefaultPlatformType().friction,
     frictionAir: 0.012,
     density: 0.002,
     chamfer: { radius: 1 },
@@ -696,11 +710,25 @@ export function isStandingOnIce(platformList: PlatformInterface[]): boolean {
   return platformTypeSkipsSettle(support?.typeId);
 }
 
+export function updatePlatformSurfaceFriction(platformList: PlatformInterface[]): void {
+  for (let i = 0; i < platformList.length && i < gameContext.platforms.length; i++) {
+    const friction = resolvePlatformSurfaceFriction(platformList[i].typeId);
+    const body = gameContext.platforms[i];
+    if (body.friction === friction && body.frictionStatic === friction) continue;
+    Body.set(body, { friction, frictionStatic: friction });
+  }
+}
+
 export function updatePlayerSurfaceFriction(platformList: PlatformInterface[]): void {
   const support = getCarrySupportPlatform(platformList) ?? getPlayerSupportPlatform(platformList);
-  const friction = getPlatformType(support?.typeId).playerFriction;
+  const friction = resolvePlatformSurfaceFriction(support?.typeId);
   if (gameContext.ball.friction === friction) return;
   Body.set(gameContext.ball, { friction });
+}
+
+export function updateSurfaceFriction(platformList: PlatformInterface[]): void {
+  updatePlatformSurfaceFriction(platformList);
+  updatePlayerSurfaceFriction(platformList);
 }
 
 export function isBallStatic(): boolean {

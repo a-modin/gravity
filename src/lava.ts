@@ -2,6 +2,7 @@ import { gameConfig } from './config';
 
 let lavaLevelY = 0;
 let wavePhase = 0;
+let lavaRiseEnabled = true;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -34,8 +35,18 @@ export function resetLava(visibleWorldBottomY: number): void {
   wavePhase = 0;
 }
 
+export function setLavaRiseEnabled(enabled: boolean): void {
+  lavaRiseEnabled = enabled;
+}
+
+export function isLavaRiseEnabled(): boolean {
+  return lavaRiseEnabled;
+}
+
 export function updateLava(dt: number, climbHeightM: number): void {
-  lavaLevelY -= lavaRiseSpeedAtHeight(climbHeightM) * dt;
+  if (lavaRiseEnabled) {
+    lavaLevelY -= lavaRiseSpeedAtHeight(climbHeightM) * dt;
+  }
   wavePhase += gameConfig.lava.waveSpeed * dt;
 }
 

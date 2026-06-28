@@ -22,6 +22,14 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+export function normalizePlatformHeight(height: number): number {
+  const config = generatorConfig();
+  const tile = gameConfig.pixelArt.tileSize;
+  const minHeight = config.minHeight;
+  const snapped = Math.ceil(Math.max(height, minHeight) / tile) * tile;
+  return clamp(snapped, minHeight, config.maxHeight);
+}
+
 function platformCenterX(platform: PlatformInterface): number {
   return platform.x + platform.width / 2;
 }
@@ -142,6 +150,7 @@ function tooCloseHorizontally(
 
 function assignPlatformIdentity(platform: PlatformInterface): PlatformInterface {
   platform.id = nextPlatformId++;
+  platform.height = normalizePlatformHeight(platform.height);
   return platform;
 }
 
@@ -162,7 +171,7 @@ function buildCandidateAtY(
     x: clamp(centerX - width / 2, config.minX, config.maxX - width),
     y,
     width,
-    height,
+    height: normalizePlatformHeight(height),
   };
 }
 
@@ -457,7 +466,11 @@ export function snapshotPlatformGenerator(): PlatformGeneratorSnapshotInterface 
 }
 
 export function restorePlatformGenerator(snapshot: PlatformGeneratorSnapshotInterface): void {
-  platforms = snapshot.platforms.map(clonePlatform);
+  platforms = snapshot.platforms.map((platform) => {
+    const copy = clonePlatform(platform);
+    copy.height = normalizePlatformHeight(copy.height);
+    return copy;
+  });
   highestBallY = snapshot.highestBallY;
   nextPlatformId = snapshot.nextPlatformId;
 
@@ -473,6 +486,7 @@ export function getPlatforms(): PlatformInterface[] {
 
 export function resetPlatformGenerator(): void {
   const config = generatorConfig();
+  startPlatform.height = normalizePlatformHeight(startPlatform.height);
   platforms = [startPlatform];
   highestBallY = startPlatform.y;
   nextPlatformId = 1;

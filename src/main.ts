@@ -1,5 +1,9 @@
 import { gameConfig } from './config';
 import {
+  formatHeightMeters,
+  onLocaleChange,
+} from './i18n';
+import {
   captureCheckpoint,
   hasCheckpoint,
   restoreCheckpoint,
@@ -11,6 +15,7 @@ import { cubeLavaContactPoint, drawLavaSplash, resetLavaSplash, spawnLavaSplash,
 import { drawMilestones } from './milestone';
 import { getObstacles, translateObstaclesOnPlatforms } from './obstacles';
 import {
+  applyDayNightState,
   drawPixelBackground,
   drawPixelCube,
   drawPixelLava,
@@ -19,8 +24,18 @@ import {
   drawPixelSlingshotLine,
   drawPixelTrajectory,
   isPlayerEyesOpen,
+  palette,
   type PlayerEyeGazeInterface,
 } from './pixelArt';
+import {
+  computeDayNightState,
+  loadStoredDayHour,
+  normalizeDayHour,
+  saveStoredDayHour,
+} from './dayNight';
+import { preloadBackgroundMusic, tryStartBackgroundMusic } from './music';
+import type { DebugPanelInterface } from './debugPanel';
+import { drawRain, isRainWet, tryUnlockRainSound, updateRain } from './rain';
 import { getPlatforms, resetPlatformGenerator, trackPlatformGeneratorHeight, updatePlatformGenerator } from './platformGenerator';
 import { playMilestoneCrossSound, playObstacleLavaBurnSound, playPlayerLavaBurnSound, playSlingPullSound, playSlingReleaseSound, preloadGameSounds, resumeAudioContext, stopSlingPullSound } from './sounds';
 import { updateMovingPlatforms } from './platformMotion';
@@ -55,7 +70,8 @@ import {
   getCarrySupportPlatform,
   isBallStatic,
   isStandingOnIce,
-  updatePlayerSurfaceFriction,
+  setSurfaceWet,
+  updateSurfaceFriction,
   type Vec2Interface,
 } from './physics';
 
@@ -70,6 +86,9 @@ const hudHeightEl = document.getElementById('hud-height') as HTMLDivElement;
 const milestonePopupEl = document.getElementById('milestone-popup') as HTMLDivElement;
 const gameOverHeightEl = document.getElementById('game-over-height') as HTMLSpanElement;
 const pauseOverlayEl = document.getElementById('pause-overlay') as HTMLDivElement;
+const pauseResumeBtn = document.getElementById('pause-resume') as HTMLButtonElement;
+
+let debugPanel: DebugPanelInterface | null = null;
 
 let width = 0;
 let height = 0;
@@ -87,6 +106,9 @@ let animTime = 0;
 let playerInLava = false;
 let paused = false;
 let lastCheckpoint: GameCheckpointInterface | null = null;
+let dayNightHour = loadStoredDayHour();
+let dayNightManual = false;
+let lastSavedDayNightHour = dayNightHour;
 
 resetPlatformGenerator();
 const startPos = startBallPosition(gameConfig.ballRadius);
@@ -94,6 +116,30 @@ resetGamePhysics(getPlatforms(), getObstacles());
 resetBallPosition(startPos);
 
 void preloadGameSounds();
+preloadBackgroundMusic();
+updateDayNightPalette();
+
+if (import.meta.env.DEV) {
+  void import('./debugPanel').then(({ initDebugPanel }) => {
+    debugPanel = initDebugPanel({
+      getDayNightHour: () => dayNightHour,
+      setDayNightHour: (hour) => {
+        dayNightHour = hour;
+        lastSavedDayNightHour = hour;
+      },
+      getDayNightManual: () => dayNightManual,
+      setDayNightManual: (manual) => {
+        dayNightManual = manual;
+      },
+      refreshDayNight: () => updateDayNightPalette(),
+    });
+    debugPanel.updateDayNightDisplay(dayNightHour, dayNightManual);
+  });
+}
+
+window.addEventListener('beforeunload', () => {
+  saveStoredDayHour(dayNightHour);
+});
 
 const cameraZone = {
   x: startPos.x,
@@ -105,6 +151,7 @@ let peakBallY = startPos.y;
 let climbHeightM = 0;
 let lastMilestonePassedM = 0;
 let milestonePopupTimer = 0;
+let milestonePopupMeters = 0;
 
 function climbCheckpointState(): ClimbCheckpointInterface {
   return {
@@ -135,7 +182,7 @@ function applyClimbCheckpoint(climb: ClimbCheckpointInterface): void {
 }
 
 function formatHeight(meters: number): string {
-  return `${meters} m`;
+  return formatHeightMeters(meters);
 }
 
 function climbHeightFromY(ballY: number): number {
@@ -160,7 +207,8 @@ function resetClimbHeight(baselineY: number): void {
 
 function triggerMilestoneCelebration(meters: number): void {
   playMilestoneCrossSound();
-  milestonePopupEl.textContent = `${meters} m`;
+  milestonePopupMeters = meters;
+  milestonePopupEl.textContent = formatHeight(meters);
   milestonePopupEl.hidden = false;
   milestonePopupEl.classList.remove('is-active');
   void milestonePopupEl.offsetWidth;
@@ -203,6 +251,35 @@ function trackClimbHeight(): void {
 
 resetClimbHeight(startPos.y);
 saveCheckpoint();
+
+onLocaleChange(() => {
+  updateHeightDisplay();
+  if (!milestonePopupEl.hidden) {
+    milestonePopupEl.textContent = formatHeight(milestonePopupMeters);
+  }
+  if (!gameOverEl.hidden) {
+    gameOverHeightEl.textContent = formatHeight(climbHeightM);
+  }
+});
+
+function persistDayNightHour(): void {
+  if (Math.abs(dayNightHour - lastSavedDayNightHour) < 0.02) return;
+  lastSavedDayNightHour = dayNightHour;
+  saveStoredDayHour(dayNightHour);
+}
+
+function updateDayNightPalette(frameDt = 0): void {
+  if (!dayNightManual && frameDt > 0) {
+    dayNightHour = normalizeDayHour(
+      dayNightHour + (frameDt / gameConfig.dayNightCycleSeconds) * 24,
+    );
+    persistDayNightHour();
+  }
+
+  applyDayNightState(computeDayNightState(dayNightHour));
+  document.body.style.background = palette.skyBottom;
+  debugPanel?.updateDayNightDisplay(dayNightHour, dayNightManual);
+}
 
 function visibleWorldBottom(): number {
   return cameraZone.y + height * (1 - gameConfig.cameraFocusRatio);
@@ -365,6 +442,12 @@ function togglePause(): void {
   setPaused(!paused);
 }
 
+pauseResumeBtn.addEventListener('click', (event) => {
+  event.stopPropagation();
+  if (!paused || !gameOverEl.hidden) return;
+  setPaused(false);
+});
+
 function restartGame(): void {
   setPaused(false);
   gameOver = false;
@@ -448,6 +531,8 @@ canvas.addEventListener('pointerdown', (e) => {
   mouseWorldPos = pointerPos(e);
   if (paused || gameOver || ballFlying) return;
   resumeAudioContext();
+  tryStartBackgroundMusic();
+  tryUnlockRainSound();
   const click = mouseWorldPos;
   dragging = true;
   pullSoundPlayed = false;
@@ -724,6 +809,8 @@ function update(frameDt: number): void {
   if (paused) return;
 
   animTime += frameDt;
+  updateDayNightPalette(frameDt);
+  updateRain(frameDt, cameraZone.x, cameraZone.y, width, height, getPlatforms());
   updateLava(frameDt, climbHeightM);
   updateLavaSplash(frameDt);
   updateMilestoneUi(frameDt);
@@ -759,7 +846,8 @@ function update(frameDt: number): void {
   }
 
   updateMovingPlatformsAndCarry();
-  updatePlayerSurfaceFriction(getPlatforms());
+  setSurfaceWet(isRainWet());
+  updateSurfaceFriction(getPlatforms());
   stepPhysics(frameDt);
   trySettleWhileSliding(frameDt);
   handleObstaclesInLava();
@@ -912,6 +1000,8 @@ function draw(): void {
   if (!playerSubmerged) {
     drawPlayer();
   }
+
+  drawRain(ctx);
 
   ctx.restore();
 

@@ -1,0 +1,128 @@
+#debug-toggle {
+  position: fixed;
+  top: 20px;
+  left: 24px;
+  z-index: 2;
+  min-height: 36px;
+  padding: 10px 12px;
+  border: 3px solid;
+  border-color: #c8a86a #5a4020 #5a4020 #c8a86a;
+  background: #8a7040;
+  color: #fff4d8;
+  font-family: "Press Start 2P", monospace;
+  font-size: clamp(7px, 1.5vw, 9px);
+  line-height: 1.6;
+  text-shadow: 2px 2px 0 #3a2810;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 #3a2810;
+  transition: transform 0.05s ease;
+}
+
+#debug-toggle:hover {
+  background: #9a8050;
+}
+
+#debug-toggle:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #3a2810;
+}
+
+#debug-toggle[aria-expanded="true"] {
+  background: #523242;
+  border-color: #a67c6a #523242 #523242 #a67c6a;
+  box-shadow: 3px 3px 0 #2e1a28;
+}
+
+#debug-panel {
+  position: fixed;
+  top: 66px;
+  left: 24px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+  padding: 12px;
+  border: 3px solid #2e4a58;
+  background: rgba(20, 28, 36, 0.92);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+}
+
+#debug-panel[hidden] {
+  display: none;
+}
+
+.debug-panel__title {
+  color: #c2e5e9;
+  font-family: "Press Start 2P", monospace;
+  font-size: clamp(7px, 1.4vw, 8px);
+  line-height: 1.6;
+}
+
+.debug-panel__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.debug-panel__label {
+  color: #a8c0c9;
+  font-family: monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.debug-panel__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.debug-panel__btn {
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 2px solid;
+  border-color: #88b4c4 #2e4a58 #2e4a58 #88b4c4;
+  background: #6a98a8;
+  color: #e6f2f5;
+  font-family: "Press Start 2P", monospace;
+  font-size: clamp(6px, 1.2vw, 7px);
+  line-height: 1.5;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 #2e4a58;
+}
+
+.debug-panel__btn:hover {
+  background: #7aa8b8;
+}
+
+.debug-panel__btn[aria-pressed="false"] {
+  background: #523242;
+  border-color: #a67c6a #523242 #523242 #a67c6a;
+  color: #a8c0c9;
+}
+
+.debug-panel__btn--small {
+  min-height: 24px;
+  padding: 4px 8px;
+  font-family: monospace;
+  font-size: 10px;
+}
+
+.debug-panel__btn--small[aria-pressed="true"] {
+  background: #6a98a8;
+  border-color: #88b4c4 #2e4a58 #2e4a58 #88b4c4;
+  color: #e6f2f5;
+}
+
+.debug-panel__slider {
+  width: 100%;
+}
+
+.debug-panel__value {
+  color: #ddd;
+  font-family: monospace;
+  font-size: 11px;
+}

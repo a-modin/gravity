@@ -1,9 +1,42 @@
 import { gameConfig } from './config';
+import { normalizePlatformHeight } from './platformGenerator';
+import type { PlatformTypeVisualConfigInterface } from './config';
 import { getPlatformType } from './platformTypes';
 import type { PlatformInterface } from './platforms';
 import type { Vec2Interface } from './physics';
 
-export const palette = {
+export interface GamePaletteInterface {
+  skyTop: string;
+  skyMid: string;
+  skyHorizon: string;
+  skyBottom: string;
+  star: string;
+  starDim: string;
+  player: string;
+  playerShadow: string;
+  playerHighlight: string;
+  playerEyeWhite: string;
+  playerPupil: string;
+  playerEyes: string;
+  playerDim: string;
+  obstacle: string;
+  obstacleShadow: string;
+  obstacleHighlight: string;
+  lavaBright: string;
+  lavaMid: string;
+  lavaDark: string;
+  lavaDeep: string;
+  lavaOutline: string;
+  slingshot: string;
+  slingshotPull: string;
+  slingshotPullMax: string;
+  slingshotAnchor: string;
+  trajectory: string;
+  white: string;
+  milestone: string;
+}
+
+export const palette: GamePaletteInterface = {
   skyTop: '#8a96a8',
   skyMid: '#b2a9c1',
   skyHorizon: '#c8d4dc',
@@ -26,14 +59,88 @@ export const palette = {
   lavaDeep: '#8a2010',
   lavaOutline: '#ffe860',
   slingshot: '#88b4c4',
+  slingshotPull: '#4cd964',
+  slingshotPullMax: '#ff453a',
   slingshotAnchor: '#7c5f4d',
   trajectory: '#c2e5e9',
   white: '#e6f2f5',
   milestone: '#c2e5e9',
-} as const;
+};
+
+let starOpacity = 0;
+let groundPlatformVisual: PlatformTypeVisualConfigInterface = { ...getPlatformType('ground').visual };
+let icePlatformVisual: PlatformTypeVisualConfigInterface = { ...getPlatformType('ice').visual };
+let milestoneLineColor = gameConfig.milestone.lineColor;
+let milestoneLabelColor = gameConfig.milestone.labelColor;
+
+export function applyDayNightState(state: {
+  palette: Pick<
+    GamePaletteInterface,
+    | 'skyTop'
+    | 'skyMid'
+    | 'skyHorizon'
+    | 'skyBottom'
+    | 'star'
+    | 'starDim'
+    | 'player'
+    | 'playerShadow'
+    | 'playerHighlight'
+    | 'playerEyeWhite'
+    | 'playerPupil'
+    | 'playerEyes'
+    | 'playerDim'
+    | 'milestone'
+  >;
+  groundVisual: PlatformTypeVisualConfigInterface;
+  iceVisual: PlatformTypeVisualConfigInterface;
+  starOpacity: number;
+  milestoneLine: string;
+  milestoneLabel: string;
+}): void {
+  Object.assign(palette, state.palette);
+  groundPlatformVisual = { ...state.groundVisual };
+  icePlatformVisual = { ...state.iceVisual };
+  starOpacity = state.starOpacity;
+  milestoneLineColor = state.milestoneLine;
+  milestoneLabelColor = state.milestoneLabel;
+}
+
+export function getPlatformDrawVisual(typeId?: string): PlatformTypeVisualConfigInterface {
+  if (typeId === 'ice') return icePlatformVisual;
+  return groundPlatformVisual;
+}
+
+export function getMilestoneDrawColors(): { lineColor: string; labelColor: string } {
+  return { lineColor: milestoneLineColor, labelColor: milestoneLabelColor };
+}
 
 export function snap(value: number, unit = gameConfig.pixelArt.snapUnit): number {
   return Math.round(value / unit) * unit;
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function lerpColor(from: string, to: string, t: number): string {
+  const a = hexToRgb(from);
+  const b = hexToRgb(to);
+  const mix = Math.max(0, Math.min(1, t));
+  const r = Math.round(a.r + (b.r - a.r) * mix);
+  const g = Math.round(a.g + (b.g - a.g) * mix);
+  const bl = Math.round(a.b + (b.b - a.b) * mix);
+  return `rgb(${r}, ${g}, ${bl})`;
+}
+
+function lerpColorAlpha(from: string, to: string, t: number, alpha: number): string {
+  const a = hexToRgb(from);
+  const b = hexToRgb(to);
+  const mix = Math.max(0, Math.min(1, t));
+  const r = Math.round(a.r + (b.r - a.r) * mix);
+  const g = Math.round(a.g + (b.g - a.g) * mix);
+  const bl = Math.round(a.b + (b.b - a.b) * mix);
+  return `rgba(${r}, ${g}, ${bl}, ${alpha})`;
 }
 
 function hash2(x: number, y: number): number {
@@ -64,6 +171,8 @@ function drawStars(
   viewHeight: number,
   animTime: number,
 ): void {
+  if (starOpacity <= 0.01) return;
+
   const { starParallax, starCell, starTwinkleSpeed } = gameConfig.pixelArt;
   const parallax = starParallax;
   const cell = starCell;
@@ -90,7 +199,7 @@ function drawStars(
       const twinkle = 0.28 + 0.72 * (0.5 + 0.5 * Math.sin(phase));
       const size = h % 13 === 0 ? 3 : 2;
 
-      ctx.globalAlpha = twinkle;
+      ctx.globalAlpha = twinkle * starOpacity;
       ctx.fillStyle = twinkle > 0.72 ? palette.star : palette.starDim;
       ctx.fillRect(snap(x), snap(y), size, size);
     }
@@ -140,11 +249,11 @@ export function drawPixelPlatforms(
   const tile = gameConfig.pixelArt.tileSize;
 
   for (const platform of platforms) {
-    const visual = getPlatformType(platform.typeId).visual;
+    const visual = getPlatformDrawVisual(platform.typeId);
     const x = snap(platform.x);
     const y = snap(platform.y);
     const w = snap(platform.width);
-    const h = snap(platform.height);
+    const h = normalizePlatformHeight(platform.height);
 
     ctx.fillStyle = visual.shadow;
     ctx.fillRect(x + 2, y + 2, w, h);
@@ -382,12 +491,28 @@ export function drawPixelSlingshotAnchor(
   dragging: boolean,
   pullRatio: number,
 ): void {
-  if (gameConfig.showPullLimit) {
-    ctx.strokeStyle = dragging && pullRatio >= 0.98 ? palette.slingshot : palette.starDim;
+  const radius = snap(maxPullRadius);
+  const centerX = snap(center.x);
+  const centerY = snap(center.y);
+
+  if (dragging) {
+    const tension = Math.max(0, Math.min(1, pullRatio));
+    ctx.fillStyle = lerpColorAlpha(palette.slingshotPull, palette.slingshotPullMax, tension, 0.16);
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = lerpColorAlpha(palette.slingshotPull, palette.slingshotPullMax, tension, 0.38);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (gameConfig.showPullLimit) {
+    ctx.strokeStyle = palette.starDim;
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 6]);
     ctx.beginPath();
-    ctx.arc(snap(center.x), snap(center.y), snap(maxPullRadius), 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
   }
@@ -405,15 +530,21 @@ export function drawPixelSlingshotLine(
   to: Vec2Interface,
   pullRatio: number,
 ): void {
-  ctx.strokeStyle = pullRatio >= 0.85 ? palette.slingshot : palette.trajectory;
-  ctx.lineWidth = 3;
+  const tension = Math.max(0, Math.min(1, pullRatio));
+  const pullColor = lerpColor(palette.slingshotPull, palette.slingshotPullMax, tension);
+
+  ctx.strokeStyle = pullColor;
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(snap(from.x), snap(from.y));
   ctx.lineTo(snap(to.x), snap(to.y));
   ctx.stroke();
 
-  ctx.fillStyle = palette.slingshot;
-  ctx.fillRect(snap(to.x) - 3, snap(to.y) - 3, 6, 6);
+  const handleSize = 7 + Math.round(tension * 2);
+  const half = Math.floor(handleSize / 2);
+  ctx.fillStyle = pullColor;
+  ctx.fillRect(snap(to.x) - half, snap(to.y) - half, handleSize, handleSize);
 }
 
 export function drawPixelTrajectory(

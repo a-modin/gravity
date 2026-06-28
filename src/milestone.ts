@@ -1,4 +1,6 @@
 import { gameConfig } from './config';
+import { formatHeightMeters } from './i18n';
+import { getMilestoneDrawColors } from './pixelArt';
 
 export function milestoneWorldY(baselineY: number, heightM: number): number {
   return baselineY - heightM * gameConfig.heightMetersScale;
@@ -31,7 +33,8 @@ export function drawMilestones(
   topWorldY: number,
   bottomWorldY: number,
 ): void {
-  const { lineColor, lineWidth, dash, labelColor, labelOffsetY } = gameConfig.milestone;
+  const { lineWidth, dash, labelOffsetY } = gameConfig.milestone;
+  const { lineColor, labelColor } = getMilestoneDrawColors();
   const left = cameraX - viewWidth * 2;
   const right = cameraX + viewWidth * 2;
   const labelX = right - viewWidth + 18;
@@ -54,7 +57,7 @@ export function drawMilestones(
     ctx.lineTo(right, y);
     ctx.stroke();
 
-    ctx.fillText(`${heightM} m`, labelX, y + labelOffsetY);
+    ctx.fillText(formatHeightMeters(heightM), labelX, y + labelOffsetY);
   }
 
   ctx.setLineDash([]);

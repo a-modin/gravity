@@ -1,0 +1,97 @@
+export interface CoreConfigInterface {
+  gravity: number;
+  restitution: number;
+  friction: number;
+  ballRadius: number;
+  launchPower: number;
+  floorRatio: number;
+  maxPull: number;
+  pullBottomPadding: number;
+  minLaunchPull: number;
+  pullSoundMinPull: number;
+  minMaxPull: number;
+  settleVelocityY: number;
+  settleVelocityX: number;
+  settleAngularVelocity: number;
+  settleStableTime: number;
+  maxGroundedFlightTime: number;
+  anchorRadius: number;
+  grabRadiusMultiplier: number;
+  physicsStep: number;
+  trajectoryMaxSteps: number;
+  maxPhysicsAccumulator: number;
+  maxFrameDelta: number;
+  cameraFocusRatio: number;
+  cameraDeadZoneWidthRatio: number;
+  cameraDeadZoneHeightRatio: number;
+  gridParallax: number;
+  gridStep: number;
+  gridColor: string;
+  gridLineWidth: number;
+  showTrajectory: boolean;
+  trajectoryUntilFirstCollision: boolean;
+  showDeadZone: boolean;
+  showPullLimit: boolean;
+  settleDelay: number;
+  heightMetersScale: number;
+  playerLaunchSpin: number;
+  playerMaxAngularVelocity: number;
+  playerStableAngleEpsilon: number;
+  playerTipTorque: number;
+  gameOverOverlayDelay: number;
+  playerFlyingOpacity: number;
+  playerIdlePulseSpeed: number;
+  playerIdlePulseScale: number;
+  playerGlowBlur: number;
+  playerGlowColor: string;
+  dayNightCycleSeconds: number;
+}
+
+export const coreConfig: CoreConfigInterface = {
+  gravity: 2000,
+  restitution: 0.6,
+  friction: 0.99,
+  ballRadius: 24,
+  launchPower: 14,
+  floorRatio: 0.62,
+  maxPull: 110,
+  pullBottomPadding: 24,
+  minLaunchPull: 8,
+  pullSoundMinPull: 4,
+  minMaxPull: 40,
+  settleVelocityY: 60,
+  settleVelocityX: 30,
+  settleAngularVelocity: 1.8,
+  settleStableTime: 0.22,
+  maxGroundedFlightTime: 2.5,
+  anchorRadius: 6,
+  grabRadiusMultiplier: 2,
+  physicsStep: 1 / 120,
+  trajectoryMaxSteps: 480,
+  maxPhysicsAccumulator: 0.1,
+  maxFrameDelta: 0.032,
+  cameraFocusRatio: 0.55,
+  cameraDeadZoneWidthRatio: 0.35,
+  cameraDeadZoneHeightRatio: 0.25,
+  gridParallax: 0.4,
+  gridStep: 120,
+  gridColor: 'rgba(130, 150, 170, 0.28)',
+  gridLineWidth: 1,
+  showTrajectory: true,
+  trajectoryUntilFirstCollision: true,
+  showDeadZone: false,
+  showPullLimit: false,
+  settleDelay: 0.15,
+  heightMetersScale: 10,
+  playerLaunchSpin: 0.0022,
+  playerMaxAngularVelocity: 2.2,
+  playerStableAngleEpsilon: 0.14,
+  playerTipTorque: 2.8,
+  gameOverOverlayDelay: 1,
+  playerFlyingOpacity: 0.78,
+  playerIdlePulseSpeed: 0.733,
+  playerIdlePulseScale: 0.045,
+  playerGlowBlur: 0,
+  playerGlowColor: 'rgba(194, 229, 233, 0.45)',
+  dayNightCycleSeconds: 240,
+};
