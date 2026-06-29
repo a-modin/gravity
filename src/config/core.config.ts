@@ -22,6 +22,7 @@ export interface CoreConfigInterface {
   trajectoryPreviewMaxSteps: number;
   maxPhysicsAccumulator: number;
   maxFrameDelta: number;
+  maxDisplayDpr: number;
   cameraFocusRatio: number;
   cameraDeadZoneWidthRatio: number;
   cameraDeadZoneHeightRatio: number;
@@ -72,6 +73,7 @@ export const coreConfig: CoreConfigInterface = {
   trajectoryPreviewMaxSteps: 240,
   maxPhysicsAccumulator: 0.1,
   maxFrameDelta: 0.032,
+  maxDisplayDpr: 2,
   cameraFocusRatio: 0.55,
   cameraDeadZoneWidthRatio: 0.35,
   cameraDeadZoneHeightRatio: 0.25,

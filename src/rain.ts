@@ -209,23 +209,37 @@ function hitsHorizontalSurface(
   return true;
 }
 
-function rainCandidatePlatforms(
+function rainDropBounds(
   drop: MainRainDropInterface,
   frameDt: number,
-  platforms: PlatformInterface[],
-): PlatformInterface[] {
+): { minX: number; maxX: number; minY: number; maxY: number } {
   const nextTipX = drop.tipX + drop.vx * frameDt;
   const nextTipY = drop.tipY + drop.vy * frameDt;
   const back = dropBack(drop);
-  const minX = Math.min(drop.tipX, nextTipX, back.x) - 28;
-  const maxX = Math.max(drop.tipX, nextTipX, back.x) + 28;
-  const minY = Math.min(drop.tipY, nextTipY, back.y) - drop.length - 12;
-  const maxY = Math.max(drop.tipY, nextTipY, back.y) + 12;
 
-  return platforms.filter((platform) => {
-    if (platform.x + platform.width < minX || platform.x > maxX) return false;
-    return platform.y >= minY && platform.y <= maxY;
-  });
+  return {
+    minX: Math.min(drop.tipX, nextTipX, back.x) - 28,
+    maxX: Math.max(drop.tipX, nextTipX, back.x) + 28,
+    minY: Math.min(drop.tipY, nextTipY, back.y) - drop.length - 12,
+    maxY: Math.max(drop.tipY, nextTipY, back.y) + 12,
+  };
+}
+
+function findRainPlatformHit(
+  drop: MainRainDropInterface,
+  frameDt: number,
+  platforms: PlatformInterface[],
+): PlatformInterface | null {
+  const { minX, maxX, minY, maxY } = rainDropBounds(drop, frameDt);
+
+  for (const platform of platforms) {
+    if (platform.x + platform.width < minX || platform.x > maxX) continue;
+    if (platform.y < minY || platform.y > maxY) continue;
+    if (!hitsPlatformTop(drop, platform, frameDt)) continue;
+    return platform;
+  }
+
+  return null;
 }
 
 function playerRainSurfaceBounds(
@@ -371,12 +385,10 @@ export function updateRain(
     }
 
     if (!hit) {
-      const nearbyPlatforms = rainCandidatePlatforms(drop, frameDt, platforms);
-      for (const platform of nearbyPlatforms) {
-        if (!hitsPlatformTop(drop, platform, frameDt)) continue;
+      const platform = findRainPlatformHit(drop, frameDt, platforms);
+      if (platform) {
         spawnSplash(drop.tipX, platform.y);
         hit = true;
-        break;
       }
     }
 

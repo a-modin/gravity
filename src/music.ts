@@ -64,5 +64,3 @@ export function tryStartBackgroundMusic(): void {
 export function preloadBackgroundMusic(): void {
   getMusicAudio().load();
 }
-
-preloadBackgroundMusic();

@@ -7,9 +7,9 @@ import {
 import { onLocaleChange, t } from './i18n';
 import { preloadBackgroundMusic } from './music';
 import { hasPendingInitialPlatformBands } from './platformGenerator';
-import { preloadGameSounds } from './sounds';
+import { preloadGameSounds, resumeAudioContext } from './sounds';
 
-type StartScreenPhaseEnum = 'loading' | 'ready' | 'hidden';
+type StartScreenPhaseEnum = 'loading' | 'ready' | 'starting' | 'hidden';
 
 let overlayEl: HTMLDivElement | null = null;
 let loadingEl: HTMLParagraphElement | null = null;
@@ -17,7 +17,6 @@ let startBtn: HTMLButtonElement | null = null;
 let titleEl: HTMLHeadingElement | null = null;
 
 let phase: StartScreenPhaseEnum = 'loading';
-let soundsReady = false;
 let onStartCallback: (() => void) | null = null;
 
 function bindElements(): void {
@@ -29,8 +28,12 @@ function bindElements(): void {
 
 function applyStaticTexts(): void {
   if (titleEl) titleEl.textContent = t('appTitle');
-  if (loadingEl && phase === 'loading') loadingEl.textContent = t('startLoading');
-  if (startBtn) startBtn.textContent = t('startPlay');
+  if (loadingEl && (phase === 'loading' || phase === 'starting')) {
+    loadingEl.textContent = phase === 'starting' ? t('startLoading') : t('startLoading');
+  }
+  if (startBtn && phase !== 'starting') {
+    startBtn.textContent = t('startPlay');
+  }
 }
 
 function showLoadingState(): void {
@@ -43,7 +46,23 @@ function showLoadingState(): void {
 
 function showReadyState(): void {
   if (loadingEl) loadingEl.hidden = true;
-  if (startBtn) startBtn.hidden = false;
+  if (startBtn) {
+    startBtn.hidden = false;
+    startBtn.disabled = false;
+    startBtn.textContent = t('startPlay');
+  }
+}
+
+function showStartingState(): void {
+  phase = 'starting';
+  if (loadingEl) {
+    loadingEl.hidden = false;
+    loadingEl.textContent = t('startLoading');
+  }
+  if (startBtn) {
+    startBtn.hidden = true;
+    startBtn.disabled = true;
+  }
 }
 
 function hideOverlay(): void {
@@ -53,15 +72,25 @@ function hideOverlay(): void {
 
 function tryAdvanceToReady(): void {
   if (phase !== 'loading') return;
-  if (!soundsReady || hasPendingInitialPlatformBands()) return;
+  if (hasPendingInitialPlatformBands()) return;
 
   phase = 'ready';
   showReadyState();
   notifyLoadingPhaseComplete();
 }
 
-function handleStart(): void {
+async function handleStart(): Promise<void> {
   if (phase !== 'ready' || !startBtn) return;
+
+  showStartingState();
+
+  try {
+    resumeAudioContext();
+    preloadBackgroundMusic();
+    await preloadGameSounds();
+  } catch {
+    // continue even if audio preload fails
+  }
 
   phase = 'hidden';
   hideOverlay();
@@ -88,21 +117,10 @@ export function initStartScreen(onStart: () => void): void {
   onLocaleChange(applyStaticTexts);
 
   startBtn?.addEventListener('click', () => {
-    handleStart();
+    void handleStart();
   });
 
   showLoadingState();
-  preloadBackgroundMusic();
   notifyLoadingPhaseBegin();
   void initCrazyGamesSdk();
-
-  void preloadGameSounds()
-    .then(() => {
-      soundsReady = true;
-      tryAdvanceToReady();
-    })
-    .catch(() => {
-      soundsReady = true;
-      tryAdvanceToReady();
-    });
 }

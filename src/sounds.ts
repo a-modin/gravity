@@ -29,11 +29,19 @@ const GAME_SOUNDS: GameSoundConfigInterface[] = [
 ];
 
 const OBSTACLE_DROP_SOUND_IDS = ['obstacle-drop-1', 'obstacle-drop-2', 'obstacle-drop-3'] as const;
+const SOUNDS_PER_DECODE_BATCH = 3;
 
-const audioContext = new AudioContext();
+let audioContext: AudioContext | null = null;
 const buffers = new Map<string, AudioBuffer>();
 let preloadPromise: Promise<void> | null = null;
 let activePullSource: AudioBufferSourceNode | null = null;
+
+function getAudioContext(): AudioContext {
+  if (!audioContext) {
+    audioContext = new AudioContext();
+  }
+  return audioContext;
+}
 
 function getSoundConfig(id: string): GameSoundConfigInterface | undefined {
   return GAME_SOUNDS.find((sound) => sound.id === id);
@@ -42,24 +50,41 @@ function getSoundConfig(id: string): GameSoundConfigInterface | undefined {
 async function decodeSound(url: string): Promise<AudioBuffer> {
   const response = await fetch(url);
   const data = await response.arrayBuffer();
-  return audioContext.decodeAudioData(data);
+  return getAudioContext().decodeAudioData(data);
+}
+
+function yieldToMainThread(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
 }
 
 export function preloadGameSounds(): Promise<void> {
   if (!preloadPromise) {
-    preloadPromise = Promise.all(
-      GAME_SOUNDS.map(async (sound) => {
-        const buffer = await decodeSound(sound.url);
-        buffers.set(sound.id, buffer);
-      }),
-    ).then(() => {});
+    preloadPromise = (async () => {
+      resumeAudioContext();
+
+      for (let index = 0; index < GAME_SOUNDS.length; index += SOUNDS_PER_DECODE_BATCH) {
+        const batch = GAME_SOUNDS.slice(index, index + SOUNDS_PER_DECODE_BATCH);
+        await Promise.all(batch.map(async (sound) => {
+          const buffer = await decodeSound(sound.url);
+          buffers.set(sound.id, buffer);
+        }));
+
+        if (index + SOUNDS_PER_DECODE_BATCH < GAME_SOUNDS.length) {
+          await yieldToMainThread();
+        }
+      }
+    })();
   }
+
   return preloadPromise;
 }
 
 export function resumeAudioContext(): void {
-  if (audioContext.state === 'suspended') {
-    void audioContext.resume();
+  const context = getAudioContext();
+  if (context.state === 'suspended') {
+    void context.resume();
   }
 }
 
@@ -70,12 +95,12 @@ function playSound(id: string, volumeScale = 1): AudioBufferSourceNode | null {
 
   resumeAudioContext();
 
-  const source = audioContext.createBufferSource();
-  const gain = audioContext.createGain();
+  const source = getAudioContext().createBufferSource();
+  const gain = getAudioContext().createGain();
   source.buffer = buffer;
   gain.gain.value = config.volume * Math.max(0, Math.min(1, volumeScale));
   source.connect(gain);
-  gain.connect(audioContext.destination);
+  gain.connect(getAudioContext().destination);
   source.start(0);
   return source;
 }
@@ -143,5 +168,3 @@ export function playObstacleLavaBurnSound(): void {
 export function playMilestoneCrossSound(): void {
   playSoundWhenReady('milestone-cross');
 }
-
-void preloadGameSounds();

@@ -144,7 +144,6 @@ initLeaderboardPanel();
 initHudLeaderboard();
 initOnboarding();
 initStartScreen(() => {
-  resumeAudioContext();
   tryStartBackgroundMusic();
   tryUnlockRainSound();
   beginOnboardingIfNeeded(() => {
@@ -346,8 +345,12 @@ function resetLavaLevel(): void {
   resetLava(visibleWorldBottom());
 }
 
+function displayPixelRatio(): number {
+  return Math.min(window.devicePixelRatio || 1, gameConfig.maxDisplayDpr);
+}
+
 function resize(): void {
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = displayPixelRatio();
   const renderScale = gameConfig.pixelArt.renderScale;
   width = window.innerWidth;
   height = window.innerHeight;
@@ -1089,7 +1092,7 @@ function drawPlayer(): void {
 }
 
 function draw(): void {
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = displayPixelRatio();
   const renderScale = gameConfig.pixelArt.renderScale;
   ctx.setTransform(renderScale * dpr, 0, 0, renderScale * dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);

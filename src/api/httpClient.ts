@@ -32,32 +32,50 @@ export async function apiRequest<T>(path: string, options: RequestOptionsInterfa
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${apiConfig.baseUrl}${path}`, {
-    ...options,
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), apiConfig.requestTimeoutMs);
 
-  if (!response.ok) {
-    let message = response.statusText || 'Request failed';
+  try {
+    const response = await fetch(`${apiConfig.baseUrl}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
 
-    try {
-      const payload = await response.json() as { message?: string | string[] };
-      if (Array.isArray(payload.message)) {
-        message = payload.message.join(', ');
-      } else if (payload.message) {
-        message = payload.message;
+    if (!response.ok) {
+      let message = response.statusText || 'Request failed';
+
+      try {
+        const payload = await response.json() as { message?: string | string[] };
+        if (Array.isArray(payload.message)) {
+          message = payload.message.join(', ');
+        } else if (payload.message) {
+          message = payload.message;
+        }
+      } catch {
+        // ignore parse errors
       }
-    } catch {
-      // ignore parse errors
+
+      throw new ApiError(message, response.status);
     }
 
-    throw new ApiError(message, response.status);
-  }
+    if (response.status === 204) {
+      return undefined as T;
+    }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
+    return response.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
 
-  return response.json() as Promise<T>;
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError('Request timed out', 408);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

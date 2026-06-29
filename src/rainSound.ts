@@ -39,5 +39,3 @@ export function tryUnlockRainSound(enabled: boolean): void {
 export function preloadRainSound(): void {
   getRainAudio().load();
 }
-
-preloadRainSound();
