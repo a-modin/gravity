@@ -16,6 +16,9 @@ export interface LocaleStringsInterface {
   debugMusic: string;
   debugMusicOn: string;
   debugMusicOff: string;
+  musicToggle: string;
+  musicToggleOn: string;
+  musicToggleOff: string;
   debugRain: string;
   debugRainOn: string;
   debugRainOff: string;
@@ -65,6 +68,9 @@ export const enLocale: LocaleStringsInterface = {
   debugMusic: 'Music',
   debugMusicOn: 'MUSIC ON',
   debugMusicOff: 'MUSIC OFF',
+  musicToggle: 'MUSIC',
+  musicToggleOn: 'Music on',
+  musicToggleOff: 'Music off',
   debugRain: 'Rain',
   debugRainOn: 'RAIN ON',
   debugRainOff: 'RAIN OFF',

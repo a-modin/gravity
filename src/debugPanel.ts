@@ -10,8 +10,12 @@ import {
   setLocale,
   t,
 } from './i18n';
+import {
+  isUserMusicEnabled,
+  setUserMusicEnabled,
+  unlockAudioPlayback,
+} from './audioSettings';
 import { isLavaRiseEnabled, setLavaRiseEnabled } from './lava';
-import { isMusicEnabled, setMusicEnabled, tryStartBackgroundMusic } from './music';
 import {
   isRainEnabled,
   isRainWeatherAutomatic,
@@ -67,10 +71,10 @@ export function initDebugPanel(context: DebugPanelContextInterface): DebugPanelI
   const musicBtn = createToggleButton();
   musicBtn.addEventListener('click', (event) => {
     event.stopPropagation();
-    const next = !isMusicEnabled();
-    setMusicEnabled(next);
+    const next = !isUserMusicEnabled();
+    setUserMusicEnabled(next);
     refreshMusicButton();
-    if (next) tryStartBackgroundMusic();
+    if (next) unlockAudioPlayback();
   });
   musicRow.controls.appendChild(musicBtn);
   panel.appendChild(musicRow.row);
@@ -152,7 +156,7 @@ export function initDebugPanel(context: DebugPanelContextInterface): DebugPanelI
   }
 
   function refreshMusicButton(): void {
-    const enabled = isMusicEnabled();
+    const enabled = isUserMusicEnabled();
     musicBtn.setAttribute('aria-pressed', String(enabled));
     musicBtn.textContent = enabled ? t('debugMusicOn') : t('debugMusicOff');
   }

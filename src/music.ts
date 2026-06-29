@@ -1,21 +1,10 @@
 import musicUrl from './music/music.mp3';
+import { isMusicAudible } from './audioSettings';
 
-const MUSIC_STORAGE_KEY = 'gravity-music-enabled';
 const MUSIC_VOLUME = 0.4;
 
 let musicAudio: HTMLAudioElement | null = null;
-let musicEnabled = readMusicEnabled();
 let musicUnlocked = false;
-
-function readMusicEnabled(): boolean {
-  try {
-    const stored = localStorage.getItem(MUSIC_STORAGE_KEY);
-    if (stored === null) return true;
-    return stored === 'true';
-  } catch {
-    return true;
-  }
-}
 
 function getMusicAudio(): HTMLAudioElement {
   if (!musicAudio) {
@@ -28,20 +17,10 @@ function getMusicAudio(): HTMLAudioElement {
   return musicAudio;
 }
 
-export function isMusicEnabled(): boolean {
-  return musicEnabled;
-}
-
-export function setMusicEnabled(enabled: boolean): void {
-  musicEnabled = enabled;
-  try {
-    localStorage.setItem(MUSIC_STORAGE_KEY, String(enabled));
-  } catch {
-    // ignore storage errors
-  }
-
+export function syncMusicPlayback(): void {
   const audio = getMusicAudio();
-  if (enabled && musicUnlocked) {
+
+  if (isMusicAudible() && musicUnlocked) {
     void audio.play().catch(() => {});
     return;
   }
@@ -49,16 +28,17 @@ export function setMusicEnabled(enabled: boolean): void {
   audio.pause();
 }
 
-export function tryStartBackgroundMusic(): void {
-  if (!musicEnabled) return;
+export function pauseMusicPlayback(): void {
+  getMusicAudio().pause();
+}
 
+export function unlockMusicPlayback(): void {
   musicUnlocked = true;
-  const audio = getMusicAudio();
-  if (!audio.paused) return;
+  syncMusicPlayback();
+}
 
-  void audio.play().catch(() => {
-    musicUnlocked = false;
-  });
+export function tryStartBackgroundMusic(): void {
+  unlockMusicPlayback();
 }
 
 export function preloadBackgroundMusic(): void {

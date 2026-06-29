@@ -15,11 +15,19 @@ export interface CrazyGamesUserModuleInterface {
   removeAuthListener(listener: (user: CrazyGamesUserInterface) => void): void;
 }
 
+export interface CrazyGamesGameSettingsInterface {
+  muteAudio?: boolean;
+  disableChat?: boolean;
+}
+
 export interface CrazyGamesGameModuleInterface {
+  settings?: CrazyGamesGameSettingsInterface;
   gameplayStart(): Promise<void>;
   gameplayStop(): Promise<void>;
   loadingStart(): Promise<void>;
   loadingStop(): Promise<void>;
+  addSettingsChangeListener(listener: (settings: CrazyGamesGameSettingsInterface) => void): void;
+  removeSettingsChangeListener(listener: (settings: CrazyGamesGameSettingsInterface) => void): void;
 }
 
 export interface CrazyGamesSdkInterface {

@@ -53,7 +53,8 @@ import {
   normalizeDayHour,
   saveStoredDayHour,
 } from './dayNight';
-import { tryStartBackgroundMusic } from './music';
+import { isGameAudioEnabled, onMusicEnabledChange, unlockAudioPlayback } from './audioSettings';
+import { initMusicButton } from './musicButton';
 import type { DebugPanelInterface } from './debugPanel';
 import {
   registerGameplaySessionProvider,
@@ -142,9 +143,15 @@ resetBallPosition(startPos);
 
 initLeaderboardPanel();
 initHudLeaderboard();
+initMusicButton();
+onMusicEnabledChange(() => {
+  if (isGameAudioEnabled()) {
+    tryUnlockRainSound();
+  }
+});
 initOnboarding();
 initStartScreen(() => {
-  tryStartBackgroundMusic();
+  unlockAudioPlayback();
   tryUnlockRainSound();
   beginOnboardingIfNeeded(() => {
     void initAuthPanel();
@@ -337,8 +344,32 @@ function updateDayNightPalette(frameDt = 0): void {
   debugPanel?.updateDayNightDisplay(dayNightHour, dayNightManual);
 }
 
+function viewScale(): number {
+  return gameConfig.viewScale;
+}
+
+function cameraFocus(): Vec2Interface {
+  return { x: width / 2, y: height * gameConfig.cameraFocusRatio };
+}
+
+function visibleWorldWidth(): number {
+  return width / viewScale();
+}
+
+function visibleWorldHeight(): number {
+  return height / viewScale();
+}
+
 function visibleWorldBottom(): number {
-  return cameraZone.y + height * (1 - gameConfig.cameraFocusRatio);
+  return cameraZone.y + height * (1 - gameConfig.cameraFocusRatio) / viewScale();
+}
+
+function applyWorldCameraTransform(targetCtx: CanvasRenderingContext2D): void {
+  const focus = cameraFocus();
+  const scale = viewScale();
+  targetCtx.translate(focus.x, focus.y);
+  targetCtx.scale(scale, scale);
+  targetCtx.translate(-cameraZone.x, -cameraZone.y);
 }
 
 function resetLavaLevel(): void {
@@ -365,7 +396,9 @@ function resize(): void {
   displayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   displayCtx.imageSmoothingEnabled = false;
 
-  const availablePull = height * (1 - gameConfig.cameraFocusRatio) - gameConfig.ballRadius - gameConfig.pullBottomPadding;
+  const availablePullScreen =
+    height * (1 - gameConfig.cameraFocusRatio) - gameConfig.ballRadius - gameConfig.pullBottomPadding;
+  const availablePull = availablePullScreen / viewScale();
   maxPull = Math.min(gameConfig.maxPull, Math.max(gameConfig.minMaxPull, availablePull));
 }
 
@@ -389,14 +422,6 @@ function ballDisplayPos(): Vec2Interface {
   return ballPos();
 }
 
-function cameraOffsetX(): number {
-  return width / 2 - cameraZone.x;
-}
-
-function cameraOffsetY(): number {
-  return height * gameConfig.cameraFocusRatio - cameraZone.y;
-}
-
 interface ScreenRectInterface {
   left: number;
   top: number;
@@ -407,11 +432,16 @@ interface ScreenRectInterface {
 const OBSTACLE_LAVA_SOUND_VIEW_MARGIN = 200;
 
 function visibleWorldBounds(margin = 0): ScreenRectInterface {
+  const scale = viewScale();
+  const halfW = width / scale / 2 + margin;
+  const topH = (height * gameConfig.cameraFocusRatio) / scale + margin;
+  const bottomH = (height * (1 - gameConfig.cameraFocusRatio)) / scale + margin;
+
   return {
-    left: cameraZone.x - width / 2 - margin,
-    right: cameraZone.x + width / 2 + margin,
-    top: cameraZone.y - height * gameConfig.cameraFocusRatio - margin,
-    bottom: cameraZone.y + height * (1 - gameConfig.cameraFocusRatio) + margin,
+    left: cameraZone.x - halfW,
+    right: cameraZone.x + halfW,
+    top: cameraZone.y - topH,
+    bottom: cameraZone.y + bottomH,
   };
 }
 
@@ -435,10 +465,13 @@ function deadZoneScreenBounds(): ScreenRectInterface {
 }
 
 function ballScreenPos(): Vec2Interface {
+  const focus = cameraFocus();
+  const scale = viewScale();
   const pos = ballDisplayPos();
+
   return {
-    x: pos.x + cameraOffsetX(),
-    y: pos.y + cameraOffsetY(),
+    x: focus.x + scale * (pos.x - cameraZone.x),
+    y: focus.y + scale * (pos.y - cameraZone.y),
   };
 }
 
@@ -460,9 +493,12 @@ function updateCameraZone(): void {
 }
 
 function screenToWorld(screen: Vec2Interface): Vec2Interface {
+  const focus = cameraFocus();
+  const scale = viewScale();
+
   return {
-    x: screen.x - cameraOffsetX(),
-    y: screen.y - cameraOffsetY(),
+    x: cameraZone.x + (screen.x - focus.x) / scale,
+    y: cameraZone.y + (screen.y - focus.y) / scale,
   };
 }
 
@@ -636,7 +672,7 @@ canvas.addEventListener('pointerdown', (e) => {
   mouseWorldPos = pointerPos(e);
   if (!isGameStarted() || isSimulationSuspended() || gameOver || ballFlying) return;
   resumeAudioContext();
-  tryStartBackgroundMusic();
+  unlockAudioPlayback();
   tryUnlockRainSound();
   onOnboardingPointerDown();
   const click = mouseWorldPos;
@@ -937,7 +973,14 @@ function update(frameDt: number): void {
 
   animTime += frameDt;
   updateDayNightPalette(frameDt);
-  updateRain(frameDt, cameraZone.x, cameraZone.y, width, height, getPlatforms());
+  updateRain(
+    frameDt,
+    cameraZone.x,
+    cameraZone.y,
+    visibleWorldWidth(),
+    visibleWorldHeight(),
+    getPlatforms(),
+  );
   updateLava(frameDt, climbHeightM);
   updateLavaSplash(frameDt);
   updateMilestoneUi(frameDt);
@@ -998,13 +1041,21 @@ function update(frameDt: number): void {
 }
 
 function drawParallaxGrid(): void {
-  drawPixelBackground(ctx, cameraZone.x, cameraZone.y, width, height, animTime);
+  drawPixelBackground(
+    ctx,
+    cameraZone.x,
+    cameraZone.y,
+    visibleWorldWidth(),
+    visibleWorldHeight(),
+    animTime,
+  );
 }
 
 function drawMilestone(): void {
-  const topWorldY = cameraZone.y - height * gameConfig.cameraFocusRatio;
-  const bottomWorldY = cameraZone.y + height * (1 - gameConfig.cameraFocusRatio);
-  drawMilestones(ctx, heightBaselineY, cameraZone.x, width, topWorldY, bottomWorldY);
+  const scale = viewScale();
+  const topWorldY = cameraZone.y - (height * gameConfig.cameraFocusRatio) / scale;
+  const bottomWorldY = cameraZone.y + (height * (1 - gameConfig.cameraFocusRatio)) / scale;
+  drawMilestones(ctx, heightBaselineY, cameraZone.x, visibleWorldWidth(), topWorldY, bottomWorldY);
 }
 
 function drawPlatforms(): void {
@@ -1013,7 +1064,7 @@ function drawPlatforms(): void {
 
 function drawLava(): void {
   const bottomY = cameraZone.y + height * 3;
-  drawPixelLava(ctx, cameraZone.x, width, bottomY, lavaSurfaceYAt);
+  drawPixelLava(ctx, cameraZone.x, visibleWorldWidth(), bottomY, lavaSurfaceYAt);
 }
 
 function drawObstacles(inLavaLayer: 'above' | 'below'): void {
@@ -1100,7 +1151,7 @@ function draw(): void {
   drawParallaxGrid();
 
   ctx.save();
-  ctx.translate(cameraOffsetX(), cameraOffsetY());
+  applyWorldCameraTransform(ctx);
 
   drawPlatforms();
   drawMilestone();

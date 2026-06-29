@@ -1,3 +1,4 @@
+import { isGameAudioEnabled } from './audioSettings';
 import milestoneCrossUrl from './sounds/milestone-cross.mp3';
 import obstacleDrop1Url from './sounds/obstacle-drop-1.mp3';
 import obstacleDrop2Url from './sounds/obstacle-drop-2.mp3';
@@ -88,7 +89,16 @@ export function resumeAudioContext(): void {
   }
 }
 
+export function suspendAudioContext(): void {
+  const context = audioContext;
+  if (context && context.state === 'running') {
+    void context.suspend();
+  }
+}
+
 function playSound(id: string, volumeScale = 1): AudioBufferSourceNode | null {
+  if (!isGameAudioEnabled()) return null;
+
   const buffer = buffers.get(id);
   const config = getSoundConfig(id);
   if (!buffer || !config) return null;

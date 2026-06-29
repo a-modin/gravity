@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:release": "npm run build && cd dist && rm -f ../gravity-release.zip && zip -r ../gravity-release.zip . -x '*.DS_Store'",
     "preview": "vite preview"
   },
   "devDependencies": {

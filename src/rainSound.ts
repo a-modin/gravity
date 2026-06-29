@@ -1,3 +1,4 @@
+import { isGameAudioEnabled } from './audioSettings';
 import { rainConfig } from './config/rain.config';
 import rainUrl from './sounds/rain.mp3';
 
@@ -18,8 +19,9 @@ function getRainAudio(): HTMLAudioElement {
 export function syncRainSound(enabled: boolean): void {
   const audio = getRainAudio();
   audio.volume = rainConfig.soundVolume;
+  const shouldPlay = enabled && isGameAudioEnabled() && rainSoundUnlocked;
 
-  if (!enabled || !rainSoundUnlocked) {
+  if (!shouldPlay) {
     audio.pause();
     return;
   }
@@ -29,6 +31,10 @@ export function syncRainSound(enabled: boolean): void {
       rainSoundUnlocked = false;
     });
   }
+}
+
+export function pauseRainSoundPlayback(): void {
+  getRainAudio().pause();
 }
 
 export function tryUnlockRainSound(enabled: boolean): void {

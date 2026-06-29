@@ -1,3 +1,4 @@
+import { initAudioSettings, initCrazyGamesAudioSettings } from './audioSettings';
 import { initCrazyGamesSdk } from './crazyGames/crazyGamesSdk';
 import {
   notifyLoadingPhaseBegin,
@@ -122,5 +123,8 @@ export function initStartScreen(onStart: () => void): void {
 
   showLoadingState();
   notifyLoadingPhaseBegin();
-  void initCrazyGamesSdk();
+  initAudioSettings();
+  void initCrazyGamesSdk().then((ready) => {
+    if (ready) initCrazyGamesAudioSettings();
+  });
 }

@@ -1,6 +1,5 @@
 import type {
   CrazyGamesEnvironmentEnum,
-  CrazyGamesGameModuleInterface,
   CrazyGamesGlobalInterface,
   CrazyGamesUserInterface,
 } from './crazyGames.types';
@@ -104,9 +103,13 @@ export function addCrazyGamesAuthListener(
   return () => userModule.removeAuthListener(listener);
 }
 
-async function callGameModule(
-  method: keyof CrazyGamesGameModuleInterface,
-): Promise<void> {
+type CrazyGamesGameCallableMethodEnum =
+  | 'gameplayStart'
+  | 'gameplayStop'
+  | 'loadingStart'
+  | 'loadingStop';
+
+async function callGameModule(method: CrazyGamesGameCallableMethodEnum): Promise<void> {
   if (!isCrazyGamesSdkReady()) return;
 
   const gameModule = getCrazyGamesGlobal()?.SDK.game;
@@ -133,4 +136,23 @@ export function notifyCrazyGamesGameplayStart(): Promise<void> {
 
 export function notifyCrazyGamesGameplayStop(): Promise<void> {
   return callGameModule('gameplayStop');
+}
+
+export function initCrazyGamesAudioSettings(
+  onMuteChange: (muted: boolean) => void,
+): void {
+  if (!isCrazyGamesSdkReady()) return;
+
+  const gameModule = getCrazyGamesGlobal()?.SDK.game;
+  if (!gameModule) return;
+
+  const applySettings = (settings: { muteAudio?: boolean }): void => {
+    onMuteChange(Boolean(settings.muteAudio));
+  };
+
+  applySettings(gameModule.settings ?? {});
+
+  if (!gameModule.addSettingsChangeListener) return;
+
+  gameModule.addSettingsChangeListener(applySettings);
 }

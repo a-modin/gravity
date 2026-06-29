@@ -1,0 +1,47 @@
+#music-toggle {
+  position: fixed;
+  top: 20px;
+  left: 24px;
+  z-index: 2;
+  min-height: 36px;
+  padding: 10px 12px;
+  border: 3px solid;
+  border-color: #88b4c4 #2e4a58 #2e4a58 #88b4c4;
+  background: #6a98a8;
+  color: #e6f2f5;
+  font-family: "Press Start 2P", monospace;
+  font-size: clamp(7px, 1.5vw, 9px);
+  line-height: 1.6;
+  text-shadow: 2px 2px 0 #2e3a48;
+  cursor: pointer;
+  box-shadow: 3px 3px #2e4a58;
+  user-select: none;
+  transition: transform 0.05s ease;
+}
+
+body:has(#debug-toggle) #music-toggle {
+  top: 62px;
+}
+
+#music-toggle.is-muted {
+  background: #4f6674;
+  color: #a8c0c9;
+}
+
+#music-toggle.is-sdk-muted {
+  opacity: 0.72;
+}
+
+#music-toggle:hover {
+  background: #7aa8b8;
+}
+
+#music-toggle.is-muted:hover {
+  background: #5a7382;
+}
+
+#music-toggle:active {
+  transform: translate(2px, 2px);
+  border-color: #2e4a58 #88b4c4 #88b4c4 #2e4a58;
+  box-shadow: 1px 1px #2e4a58;
+}
