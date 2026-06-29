@@ -5,6 +5,7 @@ import {
   notifyCrazyGamesLoadingStart,
   notifyCrazyGamesLoadingStop,
 } from './crazyGames/crazyGamesSdk';
+import { isOnboardingActive } from './onboarding';
 import { isLeaderboardOpen } from './leaderboardPanel';
 import { isStartScreenVisible } from './startScreen';
 
@@ -49,7 +50,7 @@ export function isGameplaySimulationPaused(state: GameplaySessionStateInterface)
 export function shouldReportCrazyGamesGameplayActive(state: GameplaySessionStateInterface): boolean {
   if (!state.gameStarted) return false;
   if (state.paused || state.gameOver) return false;
-  if (isStartScreenVisible() || isAuthOverlayOpen() || isLeaderboardOpen()) return false;
+  if (isStartScreenVisible() || isOnboardingActive() || isAuthOverlayOpen() || isLeaderboardOpen()) return false;
   return true;
 }
 

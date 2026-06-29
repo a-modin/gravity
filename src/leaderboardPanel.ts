@@ -1,3 +1,4 @@
+import { isOnboardingActive } from './onboarding';
 import { formatHeightMeters, onLocaleChange, t } from './i18n';
 import { requestGameplaySessionSync } from './gameplaySession';
 import { isStartScreenVisible } from './startScreen';
@@ -147,7 +148,7 @@ function closeLeaderboard(): void {
 }
 
 function handleTabDown(event: KeyboardEvent): void {
-  if (event.key !== 'Tab' || isAuthOverlayOpen() || isStartScreenVisible()) return;
+  if (event.key !== 'Tab' || isAuthOverlayOpen() || isStartScreenVisible() || isOnboardingActive()) return;
 
   event.preventDefault();
   event.stopPropagation();

@@ -1,5 +1,12 @@
 import { initAuthPanel } from './authPanel';
 import { initLeaderboardPanel } from './leaderboardPanel';
+import {
+  beginOnboardingIfNeeded,
+  initOnboarding,
+  isOnboardingActive,
+  onOnboardingLaunch,
+  onOnboardingPointerDown,
+} from './onboarding';
 import { initStartScreen, isGameStarted, tickStartScreenLoad } from './startScreen';
 import {
   initHudLeaderboard,
@@ -135,12 +142,15 @@ resetBallPosition(startPos);
 
 initLeaderboardPanel();
 initHudLeaderboard();
+initOnboarding();
 initStartScreen(() => {
   resumeAudioContext();
   tryStartBackgroundMusic();
   tryUnlockRainSound();
-  void initAuthPanel();
-  requestGameplaySessionSync();
+  beginOnboardingIfNeeded(() => {
+    void initAuthPanel();
+    requestGameplaySessionSync();
+  });
 });
 
 registerGameplaySessionProvider(() => ({
@@ -528,7 +538,7 @@ function setPaused(value: boolean): void {
 }
 
 function togglePause(): void {
-  if (!isGameStarted() || !gameOverEl.hidden) return;
+  if (!isGameStarted() || isOnboardingActive() || !gameOverEl.hidden) return;
   setPaused(!paused);
 }
 
@@ -625,6 +635,7 @@ canvas.addEventListener('pointerdown', (e) => {
   resumeAudioContext();
   tryStartBackgroundMusic();
   tryUnlockRainSound();
+  onOnboardingPointerDown();
   const click = mouseWorldPos;
   dragging = true;
   pullSoundPlayed = false;
@@ -676,6 +687,7 @@ function launch(): void {
     setBallPosition(launchPos);
     return;
   }
+  onOnboardingLaunch();
   playSlingReleaseSound();
   setBallPosition(launchPos);
   setBallFlying({

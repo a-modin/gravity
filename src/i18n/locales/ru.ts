@@ -4,6 +4,8 @@ export const ruLocale: LocaleStringsInterface = {
   appTitle: 'Gravity',
   startLoading: 'Загрузка...',
   startPlay: 'НАЧАТЬ',
+  onboardingHint: 'Тяни вниз и отпусти, чтобы прыгнуть выше',
+  onboardingDismiss: 'ПОНЯТНО',
   pauseTitle: 'ПАУЗА',
   pauseResume: 'ПРОДОЛЖИТЬ',
   pauseHint: 'ESC — продолжить',
