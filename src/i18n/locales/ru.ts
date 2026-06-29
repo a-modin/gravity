@@ -2,6 +2,8 @@ import type { LocaleStringsInterface } from './en';
 
 export const ruLocale: LocaleStringsInterface = {
   appTitle: 'Gravity',
+  startLoading: 'Загрузка...',
+  startPlay: 'НАЧАТЬ',
   pauseTitle: 'ПАУЗА',
   pauseResume: 'ПРОДОЛЖИТЬ',
   pauseHint: 'ESC — продолжить',

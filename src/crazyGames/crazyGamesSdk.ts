@@ -1,5 +1,6 @@
 import type {
   CrazyGamesEnvironmentEnum,
+  CrazyGamesGameModuleInterface,
   CrazyGamesGlobalInterface,
   CrazyGamesUserInterface,
 } from './crazyGames.types';
@@ -101,4 +102,35 @@ export function addCrazyGamesAuthListener(
   const userModule = getCrazyGamesGlobal()!.SDK.user;
   userModule.addAuthListener(listener);
   return () => userModule.removeAuthListener(listener);
+}
+
+async function callGameModule(
+  method: keyof CrazyGamesGameModuleInterface,
+): Promise<void> {
+  if (!isCrazyGamesSdkReady()) return;
+
+  const gameModule = getCrazyGamesGlobal()?.SDK.game;
+  if (!gameModule?.[method]) return;
+
+  try {
+    await gameModule[method]();
+  } catch (error) {
+    console.warn(`CrazyGames SDK game.${method} failed`, error);
+  }
+}
+
+export function notifyCrazyGamesLoadingStart(): Promise<void> {
+  return callGameModule('loadingStart');
+}
+
+export function notifyCrazyGamesLoadingStop(): Promise<void> {
+  return callGameModule('loadingStop');
+}
+
+export function notifyCrazyGamesGameplayStart(): Promise<void> {
+  return callGameModule('gameplayStart');
+}
+
+export function notifyCrazyGamesGameplayStop(): Promise<void> {
+  return callGameModule('gameplayStop');
 }

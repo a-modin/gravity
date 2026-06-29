@@ -1,6 +1,6 @@
 import { gameConfig } from './config';
 import { maybeAssignPlatformMotion, platformVerticalOverlap, sweptHorizontalExtents } from './platformMotion';
-import { simulateTrajectory, type Vec2Interface } from './physics';
+import { simulateReachabilityTrajectory, type Vec2Interface } from './physics';
 import { removeObstaclesBelow, resetObstacles, spawnObstaclesForPlatforms } from './obstacles';
 import { rollPlatformTypeId } from './platformTypes';
 import { startPlatform, type PlatformInterface } from './platforms';
@@ -9,6 +9,69 @@ let platforms: PlatformInterface[] = [startPlatform];
 let highestBallY = 0;
 let nextPlatformId = 1;
 let reachableFromStart = new Set<PlatformInterface>([startPlatform]);
+let initialBandsRemaining = 0;
+const reachabilityCache = new Map<string, boolean>();
+
+function clearReachabilityCache(): void {
+  reachabilityCache.clear();
+}
+
+function reachabilityCacheKey(from: PlatformInterface, to: PlatformInterface): string {
+  if (from.id !== undefined && to.id !== undefined) {
+    return `${from.id}:${to.id}`;
+  }
+
+  return [
+    from.id ?? 'from',
+    to.id ?? 'to',
+    to.x.toFixed(1),
+    to.y.toFixed(1),
+    to.width.toFixed(1),
+    to.height.toFixed(1),
+  ].join(':');
+}
+
+function reachabilityAngles(
+  anchor: Vec2Interface,
+  target: PlatformInterface,
+  angleSteps: number,
+  useAimCone: boolean,
+): number[] {
+  if (!useAimCone) {
+    const angles: number[] = [];
+    for (let step = 0; step < angleSteps; step++) {
+      angles.push((Math.PI * 2 * step) / angleSteps);
+    }
+    return angles;
+  }
+
+  return aimAnglesTowardTarget(anchor, target, angleSteps);
+}
+
+function aimAnglesTowardTarget(
+  anchor: Vec2Interface,
+  target: PlatformInterface,
+  angleSteps: number,
+): number[] {
+  const radius = gameConfig.ballRadius;
+  const targetX = platformCenterX(target);
+  const targetY = target.y - radius;
+  const centerAngle = Math.atan2(targetY - anchor.y, targetX - anchor.x);
+  const spread = Math.PI * 0.75;
+  const angles: number[] = [];
+
+  if (angleSteps <= 1) {
+    angles.push(centerAngle);
+    return angles;
+  }
+
+  for (let step = 0; step < angleSteps; step++) {
+    const t = step / (angleSteps - 1) - 0.5;
+    angles.push(centerAngle + t * spread);
+  }
+
+  return angles;
+}
 
 function generatorConfig() {
   return gameConfig.platformGenerator;
@@ -98,29 +161,36 @@ function isReachable(
   to: PlatformInterface,
   angleSteps = generatorConfig().reachabilityAngleSteps,
 ): boolean {
+  const cacheKey = reachabilityCacheKey(from, to);
+  const cached = reachabilityCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   const config = generatorConfig();
   const launchPlatforms = [from, to];
   const maxSpeed = gameConfig.maxPull * gameConfig.launchPower;
+  const useAimCone = angleSteps > config.placementReachabilityAngleSteps;
 
   for (const anchor of launchPoints(from)) {
-    for (let step = 0; step < angleSteps; step++) {
-      const angle = (Math.PI * 2 * step) / angleSteps;
+    const angles = reachabilityAngles(anchor, to, angleSteps, useAimCone);
 
+    for (const angle of angles) {
       for (const ratio of config.reachabilityPowerRatios) {
         const speed = maxSpeed * ratio;
         const velocity = {
           x: Math.cos(angle) * speed,
           y: Math.sin(angle) * speed,
         };
-        const trajectory = simulateTrajectory(anchor, velocity, launchPlatforms);
+        const trajectory = simulateReachabilityTrajectory(anchor, velocity, launchPlatforms);
 
         if (trajectoryLandsOnPlatform(trajectory, to)) {
+          reachabilityCache.set(cacheKey, true);
           return true;
         }
       }
     }
   }
 
+  reachabilityCache.set(cacheKey, false);
   return false;
 }
 
@@ -478,10 +548,33 @@ export function restorePlatformGenerator(snapshot: PlatformGeneratorSnapshotInte
   reachableFromStart = new Set(
     platforms.filter((platform) => reachableKeys.has(platformKey(platform))),
   );
+  clearReachabilityCache();
 }
 
 export function getPlatforms(): PlatformInterface[] {
   return platforms;
+}
+
+export function hasPendingInitialPlatformBands(): boolean {
+  return initialBandsRemaining > 0;
+}
+
+function trySpawnOneBandTowardTarget(targetY: number): boolean {
+  if (topmostPlatformY() <= targetY) return false;
+
+  const beforeTopY = topmostPlatformY();
+  spawnBand();
+
+  if (topmostPlatformY() < beforeTopY) {
+    return true;
+  }
+
+  const bandY = beforeTopY - generatorConfig().minJumpGap;
+  const emergency = createEmergencyPlatform(bandY, generatorConfig().placementReachabilityAngleSteps);
+  if (!emergency) return false;
+
+  addBandPlatforms([emergency]);
+  return true;
 }
 
 export function resetPlatformGenerator(): void {
@@ -491,11 +584,9 @@ export function resetPlatformGenerator(): void {
   highestBallY = startPlatform.y;
   nextPlatformId = 1;
   reachableFromStart = new Set<PlatformInterface>([startPlatform]);
+  initialBandsRemaining = config.initialCount;
+  clearReachabilityCache();
   resetObstacles();
-
-  for (let i = 0; i < config.initialCount; i++) {
-    spawnBand();
-  }
 }
 
 export function trackPlatformGeneratorHeight(ballY: number): void {
@@ -509,29 +600,15 @@ export function updatePlatformGenerator(ballY: number): boolean {
 
   trackPlatformGeneratorHeight(ballY);
 
-  const targetY = highestBallY - generatorConfig().lookAhead;
-  let stallAttempts = 0;
-
-  while (topmostPlatformY() > targetY && stallAttempts < 16) {
-    const beforeTopY = topmostPlatformY();
+  if (initialBandsRemaining > 0) {
+    initialBandsRemaining -= 1;
     spawnBand();
-
-    if (topmostPlatformY() < beforeTopY) {
+    changed = true;
+  } else {
+    const targetY = highestBallY - generatorConfig().lookAhead;
+    if (trySpawnOneBandTowardTarget(targetY)) {
       changed = true;
-      stallAttempts = 0;
-      continue;
     }
-
-    const bandY = beforeTopY - generatorConfig().minJumpGap;
-    const emergency = createEmergencyPlatform(bandY, generatorConfig().placementReachabilityAngleSteps);
-    if (emergency) {
-      addBandPlatforms([emergency]);
-      changed = true;
-      stallAttempts = 0;
-      continue;
-    }
-
-    stallAttempts += 1;
   }
 
   if (removeDistantPlatforms(ballY)) {

@@ -1,5 +1,7 @@
 export interface LocaleStringsInterface {
   appTitle: string;
+  startLoading: string;
+  startPlay: string;
   pauseTitle: string;
   pauseResume: string;
   pauseHint: string;
@@ -45,6 +47,8 @@ export interface LocaleStringsInterface {
 
 export const enLocale: LocaleStringsInterface = {
   appTitle: 'Gravity',
+  startLoading: 'Loading...',
+  startPlay: 'START',
   pauseTitle: 'PAUSED',
   pauseResume: 'RESUME',
   pauseHint: 'ESC — resume',

@@ -19,6 +19,7 @@ export interface CoreConfigInterface {
   grabRadiusMultiplier: number;
   physicsStep: number;
   trajectoryMaxSteps: number;
+  trajectoryPreviewMaxSteps: number;
   maxPhysicsAccumulator: number;
   maxFrameDelta: number;
   cameraFocusRatio: number;
@@ -68,6 +69,7 @@ export const coreConfig: CoreConfigInterface = {
   grabRadiusMultiplier: 2,
   physicsStep: 1 / 120,
   trajectoryMaxSteps: 480,
+  trajectoryPreviewMaxSteps: 240,
   maxPhysicsAccumulator: 0.1,
   maxFrameDelta: 0.032,
   cameraFocusRatio: 0.55,

@@ -1,5 +1,6 @@
 import { initAuthPanel } from './authPanel';
 import { initLeaderboardPanel } from './leaderboardPanel';
+import { initStartScreen, isGameStarted, tickStartScreenLoad } from './startScreen';
 import {
   initHudLeaderboard,
   setHudLeaderboardLiveScore,
@@ -45,11 +46,15 @@ import {
   normalizeDayHour,
   saveStoredDayHour,
 } from './dayNight';
-import { preloadBackgroundMusic, tryStartBackgroundMusic } from './music';
+import { tryStartBackgroundMusic } from './music';
 import type { DebugPanelInterface } from './debugPanel';
+import {
+  registerGameplaySessionProvider,
+  requestGameplaySessionSync,
+} from './gameplaySession';
 import { drawRain, isRainWet, tryUnlockRainSound, updateRain } from './rain';
-import { getPlatforms, resetPlatformGenerator, trackPlatformGeneratorHeight, updatePlatformGenerator } from './platformGenerator';
-import { playMilestoneCrossSound, playObstacleLavaBurnSound, playPlayerLavaBurnSound, playSlingPullSound, playSlingReleaseSound, preloadGameSounds, resumeAudioContext, stopSlingPullSound } from './sounds';
+import { getPlatforms, hasPendingInitialPlatformBands, resetPlatformGenerator, trackPlatformGeneratorHeight, updatePlatformGenerator } from './platformGenerator';
+import { playMilestoneCrossSound, playObstacleLavaBurnSound, playPlayerLavaBurnSound, playSlingPullSound, playSlingReleaseSound, resumeAudioContext, stopSlingPullSound } from './sounds';
 import { updateMovingPlatforms } from './platformMotion';
 import { startBallPosition } from './platforms';
 import {
@@ -117,6 +122,7 @@ let idlePulsePhase = 0;
 let animTime = 0;
 let playerInLava = false;
 let paused = false;
+let documentHidden = document.visibilityState === 'hidden';
 let lastCheckpoint: GameCheckpointInterface | null = null;
 let dayNightHour = loadStoredDayHour();
 let dayNightManual = false;
@@ -127,11 +133,22 @@ const startPos = startBallPosition(gameConfig.ballRadius);
 resetGamePhysics(getPlatforms(), getObstacles());
 resetBallPosition(startPos);
 
-void preloadGameSounds();
-preloadBackgroundMusic();
 initLeaderboardPanel();
 initHudLeaderboard();
-void initAuthPanel();
+initStartScreen(() => {
+  resumeAudioContext();
+  tryStartBackgroundMusic();
+  tryUnlockRainSound();
+  void initAuthPanel();
+  requestGameplaySessionSync();
+});
+
+registerGameplaySessionProvider(() => ({
+  gameStarted: isGameStarted(),
+  paused,
+  documentHidden,
+  gameOver,
+}));
 updateDayNightPalette();
 
 if (import.meta.env.DEV) {
@@ -158,8 +175,14 @@ window.addEventListener('beforeunload', () => {
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'hidden') return;
-  flushScoreSync(climbHeightM, true);
+  documentHidden = document.visibilityState === 'hidden';
+
+  if (documentHidden) {
+    cancelDrag();
+    flushScoreSync(climbHeightM, true);
+  }
+
+  requestGameplaySessionSync();
 });
 
 const cameraZone = {
@@ -342,6 +365,8 @@ let dragAnchor: Vec2Interface = { x: 0, y: 0 };
 let pullPos: Vec2Interface = { x: 0, y: 0 };
 let mouseWorldPos: Vec2Interface | null = null;
 let mouseOnCanvas = false;
+let cachedDragTrajectory: Vec2Interface[] = [];
+let dragTrajectoryDirty = false;
 
 function ballPos(): Vec2Interface {
   return getBallPosition();
@@ -450,6 +475,46 @@ function cancelDrag(): void {
   dragging = false;
   activePointerId = null;
   stopSlingPullSound();
+  clearDragTrajectory();
+}
+
+function clearDragTrajectory(): void {
+  cachedDragTrajectory = [];
+  dragTrajectoryDirty = false;
+}
+
+function markDragTrajectoryDirty(): void {
+  dragTrajectoryDirty = true;
+}
+
+function refreshDragTrajectory(): void {
+  if (!dragging || !gameConfig.showTrajectory) {
+    clearDragTrajectory();
+    return;
+  }
+
+  if (!dragTrajectoryDirty) return;
+  dragTrajectoryDirty = false;
+
+  const dx = dragAnchor.x - pullPos.x;
+  const dy = dragAnchor.y - pullPos.y;
+  if (Math.hypot(dx, dy) < gameConfig.minLaunchPull) {
+    cachedDragTrajectory = [];
+    return;
+  }
+
+  const velocity = {
+    x: dx * gameConfig.launchPower,
+    y: dy * gameConfig.launchPower,
+  };
+
+  cachedDragTrajectory = simulateTrajectory(ballPos(), velocity, getPlatforms(), {
+    maxSteps: gameConfig.trajectoryPreviewMaxSteps,
+  });
+}
+
+function isSimulationSuspended(): boolean {
+  return paused || documentHidden;
 }
 
 function setPaused(value: boolean): void {
@@ -459,10 +524,11 @@ function setPaused(value: boolean): void {
   if (paused) {
     cancelDrag();
   }
+  requestGameplaySessionSync();
 }
 
 function togglePause(): void {
-  if (!gameOverEl.hidden) return;
+  if (!isGameStarted() || !gameOverEl.hidden) return;
   setPaused(!paused);
 }
 
@@ -497,6 +563,7 @@ function restartGame(): void {
   animTime = 0;
   playerInLava = false;
   saveCheckpoint();
+  requestGameplaySessionSync();
 }
 
 function rewindToCheckpoint(): void {
@@ -523,6 +590,7 @@ function rewindToCheckpoint(): void {
   cameraZone.x = restored.camera.x;
   cameraZone.y = restored.camera.y;
   applyClimbCheckpoint(restored.climb);
+  requestGameplaySessionSync();
 }
 
 gameOverRewindBtn.addEventListener('click', (event) => {
@@ -553,7 +621,7 @@ canvas.addEventListener('pointerleave', () => {
 canvas.addEventListener('pointerdown', (e) => {
   mouseOnCanvas = true;
   mouseWorldPos = pointerPos(e);
-  if (paused || gameOver || ballFlying) return;
+  if (!isGameStarted() || isSimulationSuspended() || gameOver || ballFlying) return;
   resumeAudioContext();
   tryStartBackgroundMusic();
   tryUnlockRainSound();
@@ -563,6 +631,7 @@ canvas.addEventListener('pointerdown', (e) => {
   activePointerId = e.pointerId;
   dragAnchor = { ...click };
   pullPos = { ...click };
+  markDragTrajectoryDirty();
   canvas.setPointerCapture(e.pointerId);
 });
 
@@ -571,6 +640,7 @@ canvas.addEventListener('pointermove', (e) => {
   mouseWorldPos = pointerPos(e);
   if (!dragging || e.pointerId !== activePointerId) return;
   pullPos = clampPull(dragAnchor, mouseWorldPos);
+  markDragTrajectoryDirty();
   if (!pullSoundPlayed) {
     const dx = dragAnchor.x - pullPos.x;
     const dy = dragAnchor.y - pullPos.y;
@@ -585,6 +655,7 @@ function endDrag(e: PointerEvent): void {
   if (!dragging || e.pointerId !== activePointerId) return;
   dragging = false;
   activePointerId = null;
+  clearDragTrajectory();
   if (canvas.hasPointerCapture(e.pointerId)) {
     canvas.releasePointerCapture(e.pointerId);
   }
@@ -642,6 +713,7 @@ function triggerGameOver(): void {
   gameOverHeightEl.textContent = formatHeight(climbHeightM);
   gameOverEl.hidden = true;
   flushScoreSync(climbHeightM, true);
+  requestGameplaySessionSync();
 }
 
 function isPlayerTouchingLava(): boolean {
@@ -830,8 +902,23 @@ function updateMovingPlatformsAndCarry(): void {
   }
 }
 
+function updateBootstrap(frameDt: number): void {
+  animTime += frameDt;
+  updateDayNightPalette(frameDt);
+  tickStartScreenLoad();
+
+  if (updatePlatformGenerator(ballPos().y)) {
+    syncWorldBodies(getPlatforms(), getObstacles());
+  }
+}
+
 function update(frameDt: number): void {
-  if (paused) return;
+  if (!isGameStarted()) {
+    updateBootstrap(frameDt);
+    return;
+  }
+
+  if (isSimulationSuspended()) return;
 
   animTime += frameDt;
   updateDayNightPalette(frameDt);
@@ -841,6 +928,8 @@ function update(frameDt: number): void {
   updateMilestoneUi(frameDt);
   tickScoreSync(frameDt, climbHeightM);
   tickHudLeaderboard(frameDt);
+
+  refreshDragTrajectory();
 
   const canDrag = !ballFlying && !gameOver && !playerInLava;
   if (canDrag && !dragging) {
@@ -883,8 +972,13 @@ function update(frameDt: number): void {
 
   if (ballFlying) {
     trackPlatformGeneratorHeight(ballPos().y);
-  } else if (updatePlatformGenerator(ballPos().y)) {
+  }
+
+  if ((!ballFlying || hasPendingInitialPlatformBands()) && updatePlatformGenerator(ballPos().y)) {
     syncWorldBodies(getPlatforms(), getObstacles());
+    if (dragging) {
+      markDragTrajectoryDirty();
+    }
   }
 }
 
@@ -1014,13 +1108,8 @@ function draw(): void {
     const r = pullRatio();
     drawPixelSlingshotLine(ctx, dragAnchor, pullPos, r);
 
-    const velocity = {
-      x: (dragAnchor.x - pullPos.x) * gameConfig.launchPower,
-      y: (dragAnchor.y - pullPos.y) * gameConfig.launchPower,
-    };
-
-    if (gameConfig.showTrajectory) {
-      drawPixelTrajectory(ctx, simulateTrajectory(ballPos(), velocity, getPlatforms()));
+    if (gameConfig.showTrajectory && cachedDragTrajectory.length > 0) {
+      drawPixelTrajectory(ctx, cachedDragTrajectory);
     }
   }
 
@@ -1057,7 +1146,9 @@ function loop(now: number): void {
   const dt = Math.min(gameConfig.maxFrameDelta, (now - last) / 1000);
   last = now;
   update(dt);
-  draw();
+  if (!documentHidden) {
+    draw();
+  }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

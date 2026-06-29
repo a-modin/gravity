@@ -1,4 +1,6 @@
 import { formatHeightMeters, onLocaleChange, t } from './i18n';
+import { requestGameplaySessionSync } from './gameplaySession';
+import { isStartScreenVisible } from './startScreen';
 import { loadLeaderboard, onPlayerProfileChange } from './api';
 import type { LeaderboardPlayerDtoInterface, PlayerProfileDtoInterface } from './api';
 
@@ -134,16 +136,18 @@ function openLeaderboard(): void {
   if (!overlayEl || !overlayEl.hidden) return;
   overlayEl.hidden = false;
   showTableLoading();
+  requestGameplaySessionSync();
   void refreshLeaderboard();
 }
 
 function closeLeaderboard(): void {
   if (!overlayEl) return;
   overlayEl.hidden = true;
+  requestGameplaySessionSync();
 }
 
 function handleTabDown(event: KeyboardEvent): void {
-  if (event.key !== 'Tab' || isAuthOverlayOpen()) return;
+  if (event.key !== 'Tab' || isAuthOverlayOpen() || isStartScreenVisible()) return;
 
   event.preventDefault();
   event.stopPropagation();

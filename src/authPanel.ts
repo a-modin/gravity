@@ -8,6 +8,7 @@ import {
   isCrazyGamesUserAccountAvailable,
   showCrazyGamesAuthPrompt,
 } from './crazyGames/crazyGamesSdk';
+import { requestGameplaySessionSync } from './gameplaySession';
 import { onLocaleChange, t } from './i18n';
 
 let authOverlayEl: HTMLDivElement | null = null;
@@ -35,12 +36,14 @@ function openAuthOverlay(): void {
   if (!authOverlayEl) return;
   authOverlayEl.hidden = false;
   setAuthError('');
+  requestGameplaySessionSync();
 }
 
 function closeAuthOverlay(): void {
   if (!authOverlayEl) return;
   authOverlayEl.hidden = true;
   setAuthError('');
+  requestGameplaySessionSync();
 }
 
 function finishAuthFlow(): void {

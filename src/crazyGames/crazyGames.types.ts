@@ -15,9 +15,17 @@ export interface CrazyGamesUserModuleInterface {
   removeAuthListener(listener: (user: CrazyGamesUserInterface) => void): void;
 }
 
+export interface CrazyGamesGameModuleInterface {
+  gameplayStart(): Promise<void>;
+  gameplayStop(): Promise<void>;
+  loadingStart(): Promise<void>;
+  loadingStop(): Promise<void>;
+}
+
 export interface CrazyGamesSdkInterface {
   init(): Promise<void>;
   getEnvironment(): Promise<CrazyGamesEnvironmentEnum>;
+  game: CrazyGamesGameModuleInterface;
   user: CrazyGamesUserModuleInterface;
 }
 

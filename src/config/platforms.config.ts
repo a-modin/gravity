@@ -46,6 +46,7 @@ export interface PlatformGeneratorConfigInterface {
   landingSurfaceTolerance: number;
   launchPointInset: number;
   movingPlatformsEnabled: boolean;
+  reachabilityTrajectoryMaxSteps: number;
 }
 
 export interface MovingPlatformsConfigInterface {
@@ -116,6 +117,7 @@ export const platformGeneratorConfig: PlatformGeneratorConfigInterface = {
   landingSurfaceTolerance: 14,
   launchPointInset: 6,
   movingPlatformsEnabled: true,
+  reachabilityTrajectoryMaxSteps: 180,
 };
 
 export const movingPlatformsConfig: MovingPlatformsConfigInterface = {

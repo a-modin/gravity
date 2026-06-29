@@ -129,7 +129,6 @@ function createObstacleBody(obstacle: ObstacleInterface): Matter.Body {
     density: gameConfig.obstacles.density,
     chamfer: { radius: 1 },
     label: 'obstacle',
-    sleepThreshold: Infinity,
   });
   return body;
 }
@@ -795,11 +794,17 @@ export function translateObstacleBodies(deltas: Map<number, number>): void {
   }
 }
 
+export interface SimulateTrajectoryOptionsInterface {
+  maxSteps?: number;
+}
+
 export function simulateTrajectory(
   origin: Vec2Interface,
   velocity: Vec2Interface,
   platformList: PlatformInterface[],
+  options: SimulateTrajectoryOptionsInterface = {},
 ): Vec2Interface[] {
+  const maxSteps = options.maxSteps ?? gameConfig.trajectoryMaxSteps;
   const engine = Engine.create({
     gravity: matterEngineGravity(),
   });
@@ -819,7 +824,7 @@ export function simulateTrajectory(
   const points: Vec2Interface[] = [{ ...origin }];
   const dtMs = gameConfig.physicsStep * 1000;
 
-  for (let i = 0; i < gameConfig.trajectoryMaxSteps; i++) {
+  for (let i = 0; i < maxSteps; i++) {
     Engine.update(engine, dtMs);
     points.push({ x: ball.position.x, y: ball.position.y });
 
@@ -830,4 +835,14 @@ export function simulateTrajectory(
   Events.off(engine, 'collisionStart', onCollision);
 
   return points;
+}
+
+export function simulateReachabilityTrajectory(
+  origin: Vec2Interface,
+  velocity: Vec2Interface,
+  platformList: PlatformInterface[],
+): Vec2Interface[] {
+  return simulateTrajectory(origin, velocity, platformList, {
+    maxSteps: gameConfig.platformGenerator.reachabilityTrajectoryMaxSteps,
+  });
 }

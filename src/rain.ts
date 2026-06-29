@@ -209,6 +209,25 @@ function hitsHorizontalSurface(
   return true;
 }
 
+function rainCandidatePlatforms(
+  drop: MainRainDropInterface,
+  frameDt: number,
+  platforms: PlatformInterface[],
+): PlatformInterface[] {
+  const nextTipX = drop.tipX + drop.vx * frameDt;
+  const nextTipY = drop.tipY + drop.vy * frameDt;
+  const back = dropBack(drop);
+  const minX = Math.min(drop.tipX, nextTipX, back.x) - 28;
+  const maxX = Math.max(drop.tipX, nextTipX, back.x) + 28;
+  const minY = Math.min(drop.tipY, nextTipY, back.y) - drop.length - 12;
+  const maxY = Math.max(drop.tipY, nextTipY, back.y) + 12;
+
+  return platforms.filter((platform) => {
+    if (platform.x + platform.width < minX || platform.x > maxX) return false;
+    return platform.y >= minY && platform.y <= maxY;
+  });
+}
+
 function playerRainSurfaceBounds(
   centerX: number,
   centerY: number,
@@ -352,7 +371,8 @@ export function updateRain(
     }
 
     if (!hit) {
-      for (const platform of platforms) {
+      const nearbyPlatforms = rainCandidatePlatforms(drop, frameDt, platforms);
+      for (const platform of nearbyPlatforms) {
         if (!hitsPlatformTop(drop, platform, frameDt)) continue;
         spawnSplash(drop.tipX, platform.y);
         hit = true;
