@@ -28,6 +28,19 @@ export interface LocaleStringsInterface {
   dayPhaseDay: string;
   dayPhaseAfternoon: string;
   dayPhaseDusk: string;
+  authTitle: string;
+  authHint: string;
+  authSignIn: string;
+  authContinue: string;
+  authErrorGeneric: string;
+  hudBestScore: string;
+  leaderboardTitle: string;
+  leaderboardRank: string;
+  leaderboardPlayer: string;
+  leaderboardScore: string;
+  leaderboardLoading: string;
+  leaderboardEmpty: string;
+  leaderboardError: string;
 }
 
 export const enLocale: LocaleStringsInterface = {
@@ -60,4 +73,17 @@ export const enLocale: LocaleStringsInterface = {
   dayPhaseDay: 'day',
   dayPhaseAfternoon: 'afternoon',
   dayPhaseDusk: 'dusk',
+  authTitle: 'JOIN LEADERBOARD',
+  authHint: 'Sign in on CrazyGames to save your score and compete in the rankings.',
+  authSignIn: 'SIGN IN',
+  authContinue: 'PLAY WITHOUT SIGN IN',
+  authErrorGeneric: 'Sign in failed',
+  hudBestScore: 'BEST',
+  leaderboardTitle: 'LEADERBOARD',
+  leaderboardRank: '#',
+  leaderboardPlayer: 'PLAYER',
+  leaderboardScore: 'HEIGHT',
+  leaderboardLoading: 'Loading...',
+  leaderboardEmpty: 'No scores yet',
+  leaderboardError: 'Failed to load scores',
 };

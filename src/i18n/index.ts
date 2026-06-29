@@ -16,18 +16,6 @@ const LOCALES: Record<LocaleIdEnum, LocaleStringsInterface> = {
 let activeLocale: LocaleIdEnum = detectInitialLocale();
 const localeListeners = new Set<() => void>();
 
-function detectBrowserLocale(): LocaleIdEnum {
-  const languages = navigator.languages?.length
-    ? navigator.languages
-    : [navigator.language];
-
-  for (const language of languages) {
-    if (language.toLowerCase().startsWith('ru')) return 'ru';
-  }
-
-  return 'en';
-}
-
 function detectInitialLocale(): LocaleIdEnum {
   try {
     const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
@@ -36,7 +24,7 @@ function detectInitialLocale(): LocaleIdEnum {
     // ignore storage errors
   }
 
-  return detectBrowserLocale();
+  return 'en';
 }
 
 export function getLocale(): LocaleIdEnum {

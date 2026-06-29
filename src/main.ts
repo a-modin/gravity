@@ -1,3 +1,15 @@
+import { initAuthPanel } from './authPanel';
+import { initLeaderboardPanel } from './leaderboardPanel';
+import {
+  initHudLeaderboard,
+  setHudLeaderboardLiveScore,
+  tickHudLeaderboard,
+} from './hudLeaderboard';
+import {
+  flushScoreSync,
+  onClimbHeightChanged,
+  tickScoreSync,
+} from './api';
 import { gameConfig } from './config';
 import {
   formatHeightMeters,
@@ -117,6 +129,9 @@ resetBallPosition(startPos);
 
 void preloadGameSounds();
 preloadBackgroundMusic();
+initLeaderboardPanel();
+initHudLeaderboard();
+void initAuthPanel();
 updateDayNightPalette();
 
 if (import.meta.env.DEV) {
@@ -139,6 +154,12 @@ if (import.meta.env.DEV) {
 
 window.addEventListener('beforeunload', () => {
   saveStoredDayHour(dayNightHour);
+  flushScoreSync(climbHeightM, true);
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden') return;
+  flushScoreSync(climbHeightM, true);
 });
 
 const cameraZone = {
@@ -191,6 +212,7 @@ function climbHeightFromY(ballY: number): number {
 
 function updateHeightDisplay(): void {
   hudHeightEl.textContent = formatHeight(climbHeightM);
+  setHudLeaderboardLiveScore(climbHeightM);
 }
 
 function resetClimbHeight(baselineY: number): void {
@@ -227,6 +249,7 @@ function checkMilestoneCrossings(): void {
   if (currentMilestone > lastMilestonePassedM && currentMilestone >= intervalM) {
     lastMilestonePassedM = currentMilestone;
     triggerMilestoneCelebration(currentMilestone);
+    flushScoreSync(climbHeightM);
   }
 }
 
@@ -247,6 +270,7 @@ function trackClimbHeight(): void {
   climbHeightM = climbHeightFromY(y);
   updateHeightDisplay();
   checkMilestoneCrossings();
+  onClimbHeightChanged(climbHeightM);
 }
 
 resetClimbHeight(startPos.y);
@@ -617,6 +641,7 @@ function triggerGameOver(): void {
   gameOverOverlayTimer = gameConfig.gameOverOverlayDelay;
   gameOverHeightEl.textContent = formatHeight(climbHeightM);
   gameOverEl.hidden = true;
+  flushScoreSync(climbHeightM, true);
 }
 
 function isPlayerTouchingLava(): boolean {
@@ -814,6 +839,8 @@ function update(frameDt: number): void {
   updateLava(frameDt, climbHeightM);
   updateLavaSplash(frameDt);
   updateMilestoneUi(frameDt);
+  tickScoreSync(frameDt, climbHeightM);
+  tickHudLeaderboard(frameDt);
 
   const canDrag = !ballFlying && !gameOver && !playerInLava;
   if (canDrag && !dragging) {

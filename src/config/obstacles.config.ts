@@ -5,6 +5,9 @@ export interface ObstaclesConfigInterface {
   platformEdgeInset: number;
   maxCenterOffset: number;
   pyramidVariants: number[][];
+  columnChance: number;
+  columnCount: number;
+  columnHeight: number;
   density: number;
   friction: number;
   frictionAir: number;
@@ -27,6 +30,9 @@ export const obstaclesConfig: ObstaclesConfigInterface = {
     [2, 2, 1],
     [2, 1],
   ],
+  columnChance: 0.22,
+  columnCount: 2,
+  columnHeight: 5,
   density: 0.0016,
   friction: 0.42,
   frictionAir: 0.01,

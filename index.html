@@ -11,9 +11,23 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/style.css" />
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
   </head>
   <body>
-    <div id="hud-height">0 m</div>
+    <div id="hud-player-wrap">
+      <div
+        id="hud-player"
+        hidden
+      ></div>
+      <span id="hud-record"></span>
+    </div>
+    <div id="hud-right">
+      <div id="hud-height">0 m</div>
+      <div
+        id="hud-leaderboard"
+        hidden
+      ></div>
+    </div>
     <div
       id="milestone-popup"
       hidden
@@ -54,6 +68,59 @@
           >
             START OVER
           </button>
+        </div>
+      </div>
+    </div>
+    <div
+      id="auth-overlay"
+      hidden
+    >
+      <div id="auth-panel">
+        <h2 id="auth-title">JOIN LEADERBOARD</h2>
+        <p id="auth-hint">
+          Sign in on CrazyGames to save your score and compete in the rankings.
+        </p>
+        <p
+          id="auth-error"
+          hidden
+        ></p>
+        <div id="auth-actions">
+          <button
+            id="auth-sign-in"
+            type="button"
+          >
+            SIGN IN
+          </button>
+          <button
+            id="auth-continue"
+            type="button"
+          >
+            PLAY WITHOUT SIGN IN
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
+      id="leaderboard-overlay"
+      hidden
+    >
+      <div id="leaderboard-panel">
+        <h2 id="leaderboard-title">LEADERBOARD</h2>
+        <p
+          id="leaderboard-status"
+          hidden
+        ></p>
+        <div id="leaderboard-table-wrap">
+          <table id="leaderboard-table">
+            <thead>
+              <tr>
+                <th id="leaderboard-col-rank">#</th>
+                <th id="leaderboard-col-player">PLAYER</th>
+                <th id="leaderboard-col-score">HEIGHT</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-body"></tbody>
+          </table>
         </div>
       </div>
     </div>

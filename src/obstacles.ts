@@ -59,6 +59,37 @@ function addObstacle(
   });
 }
 
+function columnsFitPlatform(platform: PlatformInterface, size: number, columnCount: number): boolean {
+  const half = size / 2;
+  const inset = half + obstacleConfig().platformEdgeInset;
+  return platform.width >= columnCount * size + inset * 2;
+}
+
+function spawnObstacleColumns(platform: PlatformInterface, centerX: number): void {
+  const { columnCount, columnHeight } = obstacleConfig();
+  const size = obstacleSize();
+  const half = size / 2;
+  const inset = half + obstacleConfig().platformEdgeInset;
+
+  if (!columnsFitPlatform(platform, size, columnCount)) return;
+
+  const rowWidth = (columnCount - 1) * size;
+  const startX = centerX - rowWidth / 2;
+
+  for (let col = 0; col < columnCount; col++) {
+    const x = startX + col * size;
+
+    if (x - half < platform.x + inset || x + half > platform.x + platform.width - inset) {
+      continue;
+    }
+
+    for (let layer = 0; layer < columnHeight; layer++) {
+      const y = platform.y - half - layer * size;
+      addObstacle(x, y, size, platform.y, platform.id);
+    }
+  }
+}
+
 function spawnObstaclePyramid(platform: PlatformInterface, centerX: number): void {
   const size = obstacleSize();
   const half = size / 2;
@@ -102,6 +133,12 @@ export function trySpawnObstacleForPlatform(platform: PlatformInterface): void {
     minCenterX,
     maxCenterX,
   );
+
+  const { columnChance } = obstacleConfig();
+  if (columnChance > 0 && Math.random() < columnChance) {
+    spawnObstacleColumns(platform, centerX);
+    return;
+  }
 
   spawnObstaclePyramid(platform, centerX);
 }
