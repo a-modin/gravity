@@ -1,4 +1,3 @@
-import { initAuthPanel, tickAuthPanel } from './authPanel';
 import { initLeaderboardPanel } from './leaderboardPanel';
 import {
   beginOnboardingIfNeeded,
@@ -22,6 +21,7 @@ import { gameConfig } from './config';
 import {
   formatHeightMeters,
   onLocaleChange,
+  t,
 } from './i18n';
 import {
   captureCheckpoint,
@@ -60,6 +60,8 @@ import {
   registerGameplaySessionProvider,
   requestGameplaySessionSync,
 } from './gameplaySession';
+import { canRequestRewardedAds, requestRewardedAd } from './crazyGames/crazyGamesAds';
+import { initSilentAuth } from './crazyGames/silentAuth';
 import { drawRain, isRainWet, tryUnlockRainSound, updateRain } from './rain';
 import { getPlatforms, hasPendingInitialPlatformBands, resetPlatformGenerator, trackPlatformGeneratorHeight, updatePlatformGenerator } from './platformGenerator';
 import { playMilestoneCrossSound, playObstacleLavaBurnSound, playPlayerLavaBurnSound, playSlingPullSound, playSlingReleaseSound, resumeAudioContext, stopSlingPullSound } from './sounds';
@@ -132,6 +134,9 @@ let playerInLava = false;
 let paused = false;
 let documentHidden = document.visibilityState === 'hidden';
 let lastCheckpoint: GameCheckpointInterface | null = null;
+let rewindsRemaining = gameConfig.maxRewindsPerGame;
+let rewindAdInProgress = false;
+let rewardedAdsAvailable = false;
 let dayNightHour = loadStoredDayHour();
 let dayNightManual = false;
 let lastSavedDayNightHour = dayNightHour;
@@ -144,6 +149,9 @@ resetBallPosition(startPos);
 initLeaderboardPanel();
 initHudLeaderboard();
 initMusicButton();
+void canRequestRewardedAds().then((available) => {
+  rewardedAdsAvailable = available;
+});
 onMusicEnabledChange(() => {
   if (isGameAudioEnabled()) {
     tryUnlockRainSound();
@@ -154,7 +162,7 @@ initStartScreen(() => {
   unlockAudioPlayback();
   tryUnlockRainSound();
   beginOnboardingIfNeeded(() => {
-    void initAuthPanel();
+    void initSilentAuth();
     requestGameplaySessionSync();
   });
 });
@@ -322,6 +330,7 @@ onLocaleChange(() => {
   }
   if (!gameOverEl.hidden) {
     gameOverHeightEl.textContent = formatHeight(climbHeightM);
+    updateGameOverActions();
   }
 });
 
@@ -587,6 +596,24 @@ pauseResumeBtn.addEventListener('click', (event) => {
   setPaused(false);
 });
 
+function canOfferRewind(): boolean {
+  return (
+    !rewindAdInProgress &&
+    rewindsRemaining > 0 &&
+    hasCheckpoint(lastCheckpoint) &&
+    rewardedAdsAvailable
+  );
+}
+
+function updateGameOverActions(): void {
+  const offerRewind = canOfferRewind();
+  gameOverRewindBtn.hidden = !offerRewind;
+  if (!offerRewind) return;
+
+  gameOverRewindBtn.disabled = rewindAdInProgress;
+  gameOverRewindBtn.textContent = `${t('gameOverRewind')} (${rewindsRemaining})`;
+}
+
 function restartGame(): void {
   setPaused(false);
   gameOver = false;
@@ -611,6 +638,7 @@ function restartGame(): void {
   idlePulsePhase = 0;
   animTime = 0;
   playerInLava = false;
+  rewindsRemaining = gameConfig.maxRewindsPerGame;
   saveCheckpoint();
   requestGameplaySessionSync();
 }
@@ -644,7 +672,22 @@ function rewindToCheckpoint(): void {
 
 gameOverRewindBtn.addEventListener('click', (event) => {
   event.stopPropagation();
-  rewindToCheckpoint();
+  if (!canOfferRewind()) return;
+
+  rewindAdInProgress = true;
+  updateGameOverActions();
+
+  void requestRewardedAd().then((rewarded) => {
+    rewindAdInProgress = false;
+
+    if (rewarded) {
+      rewindsRemaining -= 1;
+      rewindToCheckpoint();
+      return;
+    }
+
+    updateGameOverActions();
+  });
 });
 
 gameOverRestartBtn.addEventListener('click', (event) => {
@@ -986,7 +1029,6 @@ function update(frameDt: number): void {
   updateMilestoneUi(frameDt);
   tickScoreSync(frameDt, climbHeightM);
   tickHudLeaderboard(frameDt);
-  tickAuthPanel(frameDt);
 
   refreshDragTrajectory();
 
@@ -1005,6 +1047,11 @@ function update(frameDt: number): void {
       gameOverOverlayTimer = Math.max(0, gameOverOverlayTimer - frameDt);
       if (gameOverOverlayTimer === 0) {
         gameOverEl.hidden = false;
+        updateGameOverActions();
+        void canRequestRewardedAds().then((available) => {
+          rewardedAdsAvailable = available;
+          updateGameOverActions();
+        });
       }
     }
     return;

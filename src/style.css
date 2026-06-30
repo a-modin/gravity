@@ -388,13 +388,6 @@ body {
   word-break: break-word;
 }
 
-#hud-record {
-  color: #a8c0c9;
-  font-size: clamp(8px, 1.3vw, 10px);
-  line-height: 1.5;
-  text-shadow: 2px 2px 0 #2e3a48;
-}
-
 #start-overlay {
   position: fixed;
   inset: 0;
@@ -489,7 +482,6 @@ body {
   }
 }
 
-#auth-overlay,
 #leaderboard-overlay {
   position: fixed;
   inset: 0;
@@ -501,12 +493,10 @@ body {
   user-select: none;
 }
 
-#auth-overlay[hidden],
 #leaderboard-overlay[hidden] {
   display: none;
 }
 
-#auth-panel,
 #leaderboard-panel {
   width: min(520px, 92vw);
   padding: 24px 20px;
@@ -516,7 +506,6 @@ body {
   box-shadow: 6px 6px 0 #2e4a58;
 }
 
-#auth-title,
 #leaderboard-title {
   margin: 0;
   color: #c2e5e9;
@@ -526,7 +515,6 @@ body {
   text-shadow: 2px 2px 0 #2e3a48;
 }
 
-#auth-hint,
 #leaderboard-status {
   margin: 14px 0 0;
   color: #a8c0c9;
@@ -536,64 +524,8 @@ body {
   text-shadow: 2px 2px 0 #2e3a48;
 }
 
-#leaderboard-status[hidden],
-#auth-error[hidden] {
+#leaderboard-status[hidden] {
   display: none;
-}
-
-#auth-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 18px;
-}
-
-#auth-sign-in,
-#auth-continue {
-  width: 100%;
-  min-height: 48px;
-  padding: 14px 18px;
-  border: 4px solid;
-  font-family: "Press Start 2P", monospace;
-  font-size: clamp(8px, 1.8vw, 10px);
-  line-height: 1.5;
-  text-shadow: 2px 2px 0 #2e3a48;
-  cursor: pointer;
-  box-shadow: 4px 4px 0 #2e4a58;
-}
-
-#auth-sign-in {
-  border-color: #88b4c4 #2e4a58 #2e4a58 #88b4c4;
-  background: #6a98a8;
-  color: #e6f2f5;
-}
-
-#auth-sign-in:hover {
-  background: #7aa8b8;
-}
-
-#auth-sign-in:disabled,
-#auth-continue:disabled {
-  opacity: 0.65;
-  cursor: wait;
-}
-
-#auth-continue {
-  border-color: #a67c6a #523242 #523242 #a67c6a;
-  background: #7c5f4d;
-  color: #e6f2f5;
-}
-
-#auth-continue:hover {
-  background: #8c6f5d;
-}
-
-#auth-error {
-  margin: 14px 0 0;
-  color: #f0b0a0;
-  font-size: clamp(8px, 1.4vw, 10px);
-  line-height: 1.5;
-  text-align: center;
 }
 
 #leaderboard-table-wrap {

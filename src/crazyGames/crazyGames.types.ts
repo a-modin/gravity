@@ -30,10 +30,23 @@ export interface CrazyGamesGameModuleInterface {
   removeSettingsChangeListener(listener: (settings: CrazyGamesGameSettingsInterface) => void): void;
 }
 
+export type CrazyGamesAdTypeEnum = 'midgame' | 'rewarded';
+
+export interface CrazyGamesAdCallbacksInterface {
+  adStarted?: () => void;
+  adFinished?: () => void;
+  adError?: (error: unknown) => void;
+}
+
+export interface CrazyGamesAdModuleInterface {
+  requestAd(type: CrazyGamesAdTypeEnum, callbacks: CrazyGamesAdCallbacksInterface): void;
+}
+
 export interface CrazyGamesSdkInterface {
   init(): Promise<void>;
   environment?: CrazyGamesEnvironmentEnum;
   getEnvironment?(): Promise<CrazyGamesEnvironmentEnum>;
+  ad: CrazyGamesAdModuleInterface;
   game: CrazyGamesGameModuleInterface;
   user: CrazyGamesUserModuleInterface;
 }

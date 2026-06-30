@@ -35,12 +35,6 @@ export interface LocaleStringsInterface {
   dayPhaseDay: string;
   dayPhaseAfternoon: string;
   dayPhaseDusk: string;
-  authTitle: string;
-  authHint: string;
-  authSignIn: string;
-  authContinue: string;
-  authErrorGeneric: string;
-  hudBestScore: string;
   leaderboardTitle: string;
   leaderboardRank: string;
   leaderboardPlayer: string;
@@ -61,7 +55,7 @@ export const enLocale: LocaleStringsInterface = {
   pauseHint: 'ESC — resume',
   gameOverTitle: 'GAME OVER',
   gameOverDistance: 'DISTANCE',
-  gameOverRewind: 'RETURN TO PLATFORM',
+  gameOverRewind: 'WATCH AD · RETURN',
   gameOverRestart: 'START OVER',
   debugToggle: 'DEBUG',
   debugTitle: 'DEV CONTROLS',
@@ -87,12 +81,6 @@ export const enLocale: LocaleStringsInterface = {
   dayPhaseDay: 'day',
   dayPhaseAfternoon: 'afternoon',
   dayPhaseDusk: 'dusk',
-  authTitle: 'JOIN LEADERBOARD',
-  authHint: 'Sign in on CrazyGames to save your score and compete in the rankings.',
-  authSignIn: 'SIGN IN',
-  authContinue: 'PLAY WITHOUT SIGN IN',
-  authErrorGeneric: 'Sign in failed',
-  hudBestScore: 'BEST',
   leaderboardTitle: 'LEADERBOARD',
   leaderboardRank: '#',
   leaderboardPlayer: 'PLAYER',

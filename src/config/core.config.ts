@@ -42,6 +42,7 @@ export interface CoreConfigInterface {
   playerStableAngleEpsilon: number;
   playerTipTorque: number;
   gameOverOverlayDelay: number;
+  maxRewindsPerGame: number;
   playerFlyingOpacity: number;
   playerIdlePulseSpeed: number;
   playerIdlePulseScale: number;
@@ -94,6 +95,7 @@ export const coreConfig: CoreConfigInterface = {
   playerStableAngleEpsilon: 0.14,
   playerTipTorque: 2.8,
   gameOverOverlayDelay: 1,
+  maxRewindsPerGame: 3,
   playerFlyingOpacity: 0.78,
   playerIdlePulseSpeed: 0.733,
   playerIdlePulseScale: 0.045,

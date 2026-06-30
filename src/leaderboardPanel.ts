@@ -9,7 +9,6 @@ let overlayEl: HTMLDivElement | null = null;
 let bodyEl: HTMLTableSectionElement | null = null;
 let statusEl: HTMLParagraphElement | null = null;
 let hudPlayerEl: HTMLDivElement | null = null;
-let hudRecordEl: HTMLSpanElement | null = null;
 
 let currentPlayer: PlayerProfileDtoInterface | null = null;
 let isLoading = false;
@@ -20,16 +19,10 @@ function bindElements(): void {
   bodyEl = document.getElementById('leaderboard-body') as HTMLTableSectionElement | null;
   statusEl = document.getElementById('leaderboard-status') as HTMLParagraphElement | null;
   hudPlayerEl = document.getElementById('hud-player') as HTMLDivElement | null;
-  hudRecordEl = document.getElementById('hud-record') as HTMLSpanElement | null;
-}
-
-function isAuthOverlayOpen(): boolean {
-  const authOverlay = document.getElementById('auth-overlay');
-  return authOverlay !== null && !authOverlay.hidden;
 }
 
 function renderHudPlayer(player: PlayerProfileDtoInterface | null): void {
-  if (!hudPlayerEl || !hudRecordEl) return;
+  if (!hudPlayerEl) return;
 
   if (!player) {
     hudPlayerEl.hidden = true;
@@ -39,7 +32,6 @@ function renderHudPlayer(player: PlayerProfileDtoInterface | null): void {
   currentPlayer = player;
   hudPlayerEl.hidden = false;
   hudPlayerEl.textContent = player.username;
-  hudRecordEl.textContent = `${t('hudBestScore')}: ${formatHeightMeters(player.bestScore)}`;
 }
 
 function renderRows(rows: LeaderboardPlayerDtoInterface[]): void {
@@ -149,7 +141,7 @@ function closeLeaderboard(): void {
 }
 
 function handleTabDown(event: KeyboardEvent): void {
-  if (event.key !== 'Tab' || isAuthOverlayOpen() || isStartScreenVisible() || isOnboardingActive()) return;
+  if (event.key !== 'Tab' || isStartScreenVisible() || isOnboardingActive()) return;
 
   event.preventDefault();
   event.stopPropagation();
@@ -190,16 +182,6 @@ function applyStaticTexts(): void {
   if (rank) rank.textContent = t('leaderboardRank');
   if (player) player.textContent = t('leaderboardPlayer');
   if (score) score.textContent = t('leaderboardScore');
-
-  const authTitle = document.getElementById('auth-title');
-  const authHint = document.getElementById('auth-hint');
-  const authSubmit = document.getElementById('auth-sign-in');
-  const authContinue = document.getElementById('auth-continue');
-
-  if (authTitle) authTitle.textContent = t('authTitle');
-  if (authHint) authHint.textContent = t('authHint');
-  if (authSubmit) authSubmit.textContent = t('authSignIn');
-  if (authContinue) authContinue.textContent = t('authContinue');
 
   renderHudPlayer(currentPlayer);
 }
