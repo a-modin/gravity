@@ -1,4 +1,5 @@
 import { apiConfig } from '../config/api.config';
+import { ensurePlayerAuthenticated } from '../authPanel';
 import { getPlayerProfile } from './auth';
 import { submitScore } from './score';
 import { isAuthenticated } from './session';
@@ -15,6 +16,11 @@ function canSyncScore(score: number, force: boolean): boolean {
 }
 
 async function trySyncScore(score: number, force = false): Promise<void> {
+  if (!isAuthenticated()) {
+    void ensurePlayerAuthenticated();
+    return;
+  }
+
   if (!canSyncScore(score, force)) return;
 
   if (syncInFlight) {
@@ -51,9 +57,15 @@ export function onClimbHeightChanged(score: number): void {
 }
 
 export function tickScoreSync(frameDt: number, score: number): void {
-  if (!isAuthenticated() || score <= 0) return;
+  if (score <= 0) return;
 
   pendingScore = Math.max(pendingScore, score);
+
+  if (!isAuthenticated()) {
+    void ensurePlayerAuthenticated();
+    return;
+  }
+
   if (!canSyncScore(score, false)) {
     syncTimer = 0;
     return;

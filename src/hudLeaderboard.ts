@@ -140,10 +140,33 @@ function renderHudEntries(entries: HudLeaderboardEntryInterface[]): void {
   }
 }
 
+function buildPublicHudEntries(rows: LeaderboardPlayerDtoInterface[]): HudLeaderboardEntryInterface[] {
+  const topCount = Math.min(TOP_ROWS, rows.length);
+  const entries: HudLeaderboardEntryInterface[] = [];
+
+  for (let index = 0; index < topCount; index++) {
+    const row = rows[index];
+    entries.push({
+      type: 'row',
+      rank: index + 1,
+      username: row.username,
+      bestScore: row.bestScore,
+      isCurrent: false,
+    });
+  }
+
+  return entries;
+}
+
 function renderFromCache(): void {
-  const player = getPlayerProfile();
-  if (!player || !isAuthenticated()) {
+  if (cachedRows.length === 0) {
     renderHudEntries([]);
+    return;
+  }
+
+  const player = isAuthenticated() ? getPlayerProfile() : null;
+  if (!player) {
+    renderHudEntries(buildPublicHudEntries(cachedRows));
     return;
   }
 
@@ -152,26 +175,16 @@ function renderFromCache(): void {
 }
 
 export async function refreshHudLeaderboard(): Promise<void> {
-  if (!containerEl || !isAuthenticated()) {
-    cachedRows = [];
-    renderHudEntries([]);
-    return;
-  }
-
-  const player = getPlayerProfile();
-  if (!player) {
-    cachedRows = [];
-    renderHudEntries([]);
-    return;
-  }
+  if (!containerEl) return;
 
   if (refreshInFlight) return;
   refreshInFlight = true;
 
   try {
     cachedRows = await loadLeaderboard();
-  } catch {
+  } catch (error) {
     cachedRows = [];
+    console.warn('Failed to load leaderboard', error);
   } finally {
     refreshInFlight = false;
     renderFromCache();
@@ -186,8 +199,6 @@ export function setHudLeaderboardLiveScore(score: number): void {
 }
 
 export function tickHudLeaderboard(frameDt: number): void {
-  if (!isAuthenticated()) return;
-
   refreshTimer += frameDt;
   if (refreshTimer < apiConfig.hudLeaderboardRefreshS) return;
 

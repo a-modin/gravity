@@ -53,21 +53,59 @@ export function isCrazyGamesSdkReady(): boolean {
   return sdkReady && getCrazyGamesGlobal()?.SDK !== undefined;
 }
 
+function isCrazyGamesHosted(): boolean {
+  const host = window.location.hostname.toLowerCase();
+  return host === 'crazygames.com' || host.endsWith('.crazygames.com');
+}
+
+function readCrazyGamesEnvironment(): CrazyGamesEnvironmentEnum | null {
+  const sdk = getCrazyGamesGlobal()?.SDK;
+  if (!sdk) return null;
+
+  const environment = sdk.environment;
+  if (environment === 'local' || environment === 'crazygames' || environment === 'disabled') {
+    return environment;
+  }
+
+  return null;
+}
+
 export async function getCrazyGamesEnvironment(): Promise<CrazyGamesEnvironmentEnum> {
   if (!isCrazyGamesSdkReady()) return 'disabled';
 
+  const environment = readCrazyGamesEnvironment();
+  if (environment) return environment;
+
   try {
-    return await getCrazyGamesGlobal()!.SDK.getEnvironment();
+    const resolved = await getCrazyGamesGlobal()!.SDK.getEnvironment?.();
+    if (resolved === 'local' || resolved === 'crazygames' || resolved === 'disabled') {
+      return resolved;
+    }
   } catch {
-    return 'disabled';
+    // fall through
   }
+
+  if (isCrazyGamesHosted()) return 'crazygames';
+
+  return 'disabled';
 }
 
-export async function isCrazyGamesUserAccountAvailable(): Promise<boolean> {
+export function isCrazyGamesHostedGame(): boolean {
+  return isCrazyGamesHosted();
+}
+
+export async function isCrazyGamesAuthSupported(): Promise<boolean> {
   if (!isCrazyGamesSdkReady()) return false;
 
   const environment = await getCrazyGamesEnvironment();
   if (environment === 'disabled') return false;
+
+  return environment === 'crazygames' || environment === 'local';
+}
+
+export async function isCrazyGamesUserAccountAvailable(): Promise<boolean> {
+  if (!isCrazyGamesSdkReady()) return false;
+  if (!(await isCrazyGamesAuthSupported())) return false;
 
   return getCrazyGamesGlobal()!.SDK.user.isUserAccountAvailable;
 }

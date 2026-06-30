@@ -127,6 +127,7 @@ async function refreshLeaderboard(): Promise<void> {
     setStatus('');
   } catch (error) {
     const message = error instanceof Error ? error.message : t('leaderboardError');
+    console.warn('Failed to load leaderboard', error);
     showTableMessage(message);
   } finally {
     isLoading = false;

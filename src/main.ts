@@ -1,4 +1,4 @@
-import { initAuthPanel } from './authPanel';
+import { initAuthPanel, tickAuthPanel } from './authPanel';
 import { initLeaderboardPanel } from './leaderboardPanel';
 import {
   beginOnboardingIfNeeded,
@@ -986,6 +986,7 @@ function update(frameDt: number): void {
   updateMilestoneUi(frameDt);
   tickScoreSync(frameDt, climbHeightM);
   tickHudLeaderboard(frameDt);
+  tickAuthPanel(frameDt);
 
   refreshDragTrajectory();
 

@@ -32,7 +32,8 @@ export interface CrazyGamesGameModuleInterface {
 
 export interface CrazyGamesSdkInterface {
   init(): Promise<void>;
-  getEnvironment(): Promise<CrazyGamesEnvironmentEnum>;
+  environment?: CrazyGamesEnvironmentEnum;
+  getEnvironment?(): Promise<CrazyGamesEnvironmentEnum>;
   game: CrazyGamesGameModuleInterface;
   user: CrazyGamesUserModuleInterface;
 }
